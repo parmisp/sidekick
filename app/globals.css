@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* Design tokens — match the approved wireframe exactly. */
+:root {
+  --bg: #eff3ea;
+  --surface: #ffffff;
+  --ink: #1e2b23;
+  --ink-soft: #5b6b60;
+  --accent: #ff6f45;
+  --accent-ink: #7a2e14;
+  --green: #3d6e5b;
+  --green-soft: #e4eee7;
+  --mustard: #f2b33d;
+  --mustard-soft: #fbebc9;
+  --line: #dde4d6;
+  --frame: #16201a;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-mustard: var(--mustard);
+  --color-mustard-soft: var(--mustard-soft);
+  --color-line: var(--line);
+  --color-frame: var(--frame);
+  --font-serif: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-work-sans), system-ui, sans-serif;
+  --shadow-card: 0 1px 2px rgb(30 43 35 / 0.06), 0 8px 24px rgb(30 43 35 / 0.08);
+}
+
+html {
+  background: var(--frame);
+}
+
+body {
+  background: var(--frame);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[15px] font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45;
+}
+@utility btn-primary {
+  @apply btn bg-accent text-white shadow-[0_6px_16px_rgb(255_111_69/0.35)] hover:brightness-105;
+}
+@utility btn-secondary {
+  @apply btn border border-line bg-surface text-ink hover:bg-green-soft;
+}
+@utility btn-ghost {
+  @apply btn text-ink-soft hover:bg-green-soft;
+}
+@utility card {
+  @apply rounded-3xl bg-surface shadow-card;
+}
+@utility field {
+  @apply w-full rounded-2xl border border-line bg-surface px-4 py-3 text-[15px] text-ink outline-none placeholder:text-ink-soft/60 focus:border-green focus:ring-2 focus:ring-green/20;
+}
+@utility label {
+  @apply mb-1.5 block text-xs font-semibold tracking-wide text-ink-soft uppercase;
+}
+@utility pill {
+  @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium;
+}
