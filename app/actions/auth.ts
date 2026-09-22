@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { clearSession, getCurrentUser, setSession } from "@/lib/auth";
 import { DEMO_VERIFICATION_CODE, isAllowedEmail } from "@/lib/config";
-import { db, newId } from "@/lib/db";
+import { get, newId, run } from "@/lib/db";
 import { hashPhone, normalizePhone } from "@/lib/phone";
 import type { ActionResult } from "@/lib/types";
 
@@ -22,15 +22,13 @@ export async function verifyCode(email: string, code: string): Promise<ActionRes
   // TODO: replace with real email verification provider before launch.
   if (code.trim() !== DEMO_VERIFICATION_CODE) return { ok: false, error: "That code isn't right. (Demo mode: use 000000.)" };
 
-  const conn = db();
   const normalized = email.trim().toLowerCase();
-  let user = conn.prepare("SELECT id, phone, profile_complete FROM users WHERE email = ?").get(normalized) as
-    | { id: string; phone: string | null; profile_complete: number }
-    | undefined;
-  if (!user) {
-    user = { id: newId(), phone: null, profile_complete: 0 };
-    conn.prepare("INSERT INTO users (id, email, created_at) VALUES (?, ?, ?)").run(user.id, normalized, Date.now());
-  }
+  // INSERT OR IGNORE so two simultaneous first logins can't create duplicate accounts.
+  await run("INSERT OR IGNORE INTO users (id, email, created_at) VALUES (?, ?, ?)", [newId(), normalized, Date.now()]);
+  const user = (await get<{ id: string; phone: string | null; profile_complete: number }>(
+    "SELECT id, phone, profile_complete FROM users WHERE email = ?",
+    [normalized],
+  ))!;
   await setSession(user.id);
   return { ok: true, next: !user.phone ? "/login/phone" : user.profile_complete ? "/discover" : "/setup" };
 }
@@ -41,7 +39,7 @@ export async function savePhone(phone: string): Promise<ActionResult> {
   const normalized = normalizePhone(phone);
   if (!normalized) return { ok: false, error: "Enter a valid phone number, including area code." };
   // TODO: verify phone ownership via SMS before launch. The demo trusts whatever is typed.
-  db().prepare("UPDATE users SET phone = ?, phone_hash = ? WHERE id = ?").run(phone.trim(), hashPhone(normalized), user.id);
+  await run("UPDATE users SET phone = ?, phone_hash = ? WHERE id = ?", [phone.trim(), hashPhone(normalized), user.id]);
   return { ok: true };
 }
 

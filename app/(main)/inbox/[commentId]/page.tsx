@@ -4,22 +4,22 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "@/components/icons";
 import { ProfileView } from "@/components/ProfileView";
 import { requireOnboardedUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { run } from "@/lib/db";
 import { getInboxItem } from "@/lib/inbox";
-import { getProfile } from "@/lib/profiles";
+import { getProfile, getUserTagIds } from "@/lib/profiles";
 import { timeAgo } from "@/lib/time";
 import { InboxActions } from "./InboxActions";
 
 export default async function InboxItemPage({ params }: PageProps<"/inbox/[commentId]">) {
   const { commentId } = await params;
   const user = await requireOnboardedUser();
-  const item = getInboxItem(user, commentId);
-  const author = item && getProfile(item.authorId);
+  const item = await getInboxItem(user, commentId);
+  const author = item && (await getProfile(item.authorId));
   if (!item || !author) notFound();
 
-  if (!item.isRead) db().prepare("UPDATE comments SET is_read = 1 WHERE id = ?").run(item.id);
+  if (!item.isRead) await run("UPDATE comments SET is_read = 1 WHERE id = ?", [item.id]);
 
-  const viewerTags = new Set(getProfile(user.id)?.interests.map((t) => t.id));
+  const viewerTags = new Set(await getUserTagIds(user.id));
   const first = item.authorName.split(" ")[0];
 
   return (

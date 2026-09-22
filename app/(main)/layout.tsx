@@ -9,7 +9,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
     <>
       <header className="sticky top-0 z-20 flex flex-col gap-3 bg-bg/95 px-4 pt-4 pb-3 backdrop-blur">
         <Logo />
-        <TopTabs unreadInbox={countUnreadInbox(user)} />
+        <TopTabs unreadInbox={await countUnreadInbox(user)} />
       </header>
       <main className="flex flex-1 flex-col px-4 pb-28">{children}</main>
       <BottomNav />

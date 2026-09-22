@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { get } from "./db";
 import type { UserRow } from "./types";
 
 /**
@@ -7,8 +7,7 @@ import type { UserRow } from "./types";
  * both people's gender filters allow it.
  *
  * The gender filter is applied mutually: someone who chose "same gender" is also
- * never shown to people outside that setting. Bind :viewerId, :viewerGender,
- * :viewerFilter, :viewerPhoneHash.
+ * never shown to people outside that setting. Bind with viewerParams().
  */
 export const MUTUALLY_VISIBLE_SQL = /* sql */ `
   u.profile_complete = 1
@@ -28,20 +27,8 @@ export function viewerParams(viewer: UserRow) {
   };
 }
 
-export function canSee(viewer: UserRow, targetId: string): boolean {
-  return !!db()
-    .prepare(`SELECT 1 FROM users u WHERE u.id = :targetId AND ${MUTUALLY_VISIBLE_SQL}`)
-    .get({ ...viewerParams(viewer), targetId });
-}
-
-/** Blocks only (ignores gender filters) — used for existing matches, chats and inbox. */
-export function isBlockedPair(a: UserRow, b: UserRow): boolean {
-  return !!db()
-    .prepare(
-      `SELECT 1 FROM phone_blocks
-       WHERE (blocker_id = ? AND blocked_phone_hash = ?) OR (blocker_id = ? AND blocked_phone_hash = ?)`,
-    )
-    .get(a.id, b.phone_hash ?? "", b.id, a.phone_hash ?? "");
+export async function canSee(viewer: UserRow, targetId: string): Promise<boolean> {
+  return !!(await get(`SELECT 1 AS ok FROM users u WHERE u.id = :targetId AND ${MUTUALLY_VISIBLE_SQL}`, { ...viewerParams(viewer), targetId }));
 }
 
 export const NOT_BLOCKED_SQL = (otherAlias: string) => /* sql */ `

@@ -6,7 +6,7 @@ const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"], wei
 const workSans = Work_Sans({ variable: "--font-work-sans", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
-  title: "Sidequest",
+  title: "Sidekick",
   description: "Find your people on campus. Friends, not dates.",
 };
 

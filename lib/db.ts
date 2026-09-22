@@ -1,27 +1,88 @@
-import Database from "better-sqlite3";
+import { createClient, type Client, type InArgs, type Transaction } from "@libsql/client";
 import fs from "node:fs";
 import path from "node:path";
 import { SCHEMA } from "./schema";
-import { seedDatabase } from "./seed";
+import { seedStatements } from "./seed";
 
+// Local dev: a SQLite file in ./data (no setup). Deployed (e.g. Vercel, whose disk is
+// read-only): a hosted Turso database via TURSO_DATABASE_URL + TURSO_AUTH_TOKEN.
 export const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
+export const IS_HOSTED_DB = !!process.env.TURSO_DATABASE_URL;
 
-const globalForDb = globalThis as unknown as { __sidequestDb?: Database.Database };
+/** Anything that can run a statement: the client itself or an open transaction. */
+export type Executor = Pick<Client | Transaction, "execute">;
 
-/** Lazily opens data/sidequest.db, creates tables and seeds demo data on first run. */
-export function db(): Database.Database {
-  if (!globalForDb.__sidequestDb) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    const conn = new Database(path.join(DATA_DIR, "sidequest.db"));
-    conn.pragma("journal_mode = WAL");
-    conn.pragma("foreign_keys = ON");
-    conn.exec(SCHEMA);
-    const { n } = conn.prepare("SELECT COUNT(*) AS n FROM interest_tags").get() as { n: number };
-    if (n === 0) seedDatabase(conn);
-    globalForDb.__sidequestDb = conn;
+const globalForDb = globalThis as unknown as { __sidekickDb?: Promise<Client> };
+
+async function init(): Promise<Client> {
+  if (!IS_HOSTED_DB && process.env.VERCEL) {
+    throw new Error("TURSO_DATABASE_URL is not set. Vercel's filesystem is read-only, so a hosted database is required (see README).");
   }
-  return globalForDb.__sidequestDb;
+  if (!IS_HOSTED_DB) fs.mkdirSync(DATA_DIR, { recursive: true });
+  const client = createClient(
+    IS_HOSTED_DB
+      ? { url: process.env.TURSO_DATABASE_URL!, authToken: process.env.TURSO_AUTH_TOKEN }
+      : { url: `file:${path.join(/*turbopackIgnore: true*/ DATA_DIR, "sidekick.db")}` },
+  );
+  if (!IS_HOSTED_DB) await client.execute("PRAGMA journal_mode = WAL");
+  await client.execute("PRAGMA foreign_keys = ON");
+  await client.executeMultiple(SCHEMA);
+
+  const seeded = await client.execute("SELECT 1 FROM app_meta WHERE key = 'seeded'");
+  if (seeded.rows.length === 0) {
+    try {
+      // The app_meta insert runs first in the same atomic batch, so if two server
+      // instances seed at once, one fails on the primary key and nothing is duplicated.
+      await client.batch([{ sql: "INSERT INTO app_meta (key, value) VALUES ('seeded', ?)", args: [Date.now()] }, ...seedStatements()], "write");
+    } catch (e) {
+      const again = await client.execute("SELECT 1 FROM app_meta WHERE key = 'seeded'");
+      if (again.rows.length === 0) throw e;
+    }
+  }
+  return client;
+}
+
+/** Lazily connects, creates tables and seeds demo data, once per server instance. */
+export function db(): Promise<Client> {
+  globalForDb.__sidekickDb ??= init().catch((e) => {
+    globalForDb.__sidekickDb = undefined; // retry on the next request
+    throw e;
+  });
+  return globalForDb.__sidekickDb;
+}
+
+const plain = <T>(rows: Record<string, unknown>[]): T[] => rows.map((r) => ({ ...r }) as T);
+
+async function exec(sql: string, args: InArgs = [], ex?: Executor) {
+  return (ex ?? (await db())).execute({ sql, args });
+}
+
+export async function all<T>(sql: string, args?: InArgs, ex?: Executor): Promise<T[]> {
+  return plain<T>((await exec(sql, args, ex)).rows as unknown as Record<string, unknown>[]);
+}
+
+export async function get<T>(sql: string, args?: InArgs, ex?: Executor): Promise<T | null> {
+  return (await all<T>(sql, args, ex))[0] ?? null;
+}
+
+export async function run(sql: string, args?: InArgs, ex?: Executor): Promise<{ changes: number }> {
+  return { changes: (await exec(sql, args, ex)).rowsAffected };
+}
+
+/** Interactive write transaction; rolls back if `fn` throws. */
+export async function tx<T>(fn: (t: Transaction) => Promise<T>): Promise<T> {
+  const t = await (await db()).transaction("write");
+  try {
+    const result = await fn(t);
+    await t.commit();
+    return result;
+  } catch (e) {
+    await t.rollback().catch(() => {});
+    throw e;
+  } finally {
+    t.close();
+  }
 }
 
 export const newId = () => crypto.randomUUID();

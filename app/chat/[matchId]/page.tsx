@@ -10,8 +10,8 @@ import { ChatView } from "./ChatView";
 export default async function ChatPage({ params }: PageProps<"/chat/[matchId]">) {
   const { matchId } = await params;
   const user = await requireOnboardedUser();
-  const match = getMatchForViewer(user, matchId);
-  const other = match && getProfile(match.otherId);
+  const match = await getMatchForViewer(user, matchId);
+  const other = match && (await getProfile(match.otherId));
   if (!match || !other) notFound();
 
   const first = other.name.split(" ")[0];
@@ -37,7 +37,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[matchId]">)
         createdAt={match.createdAt}
         source={match.source}
         sourceComment={match.sourceComment}
-        initialMessages={getMessages(match.id)}
+        initialMessages={await getMessages(match.id)}
       />
     </div>
   );

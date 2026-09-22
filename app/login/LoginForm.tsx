@@ -61,7 +61,7 @@ export function LoginForm() {
           <button className="btn-primary" disabled={pending || !email}>
             {pending ? "Sending…" : "Send code"}
           </button>
-          <p className="text-center text-xs text-ink-soft">Only verified student emails can join Sidequest.</p>
+          <p className="text-center text-xs text-ink-soft">Only verified student emails can join Sidekick.</p>
         </form>
       ) : (
         <form onSubmit={submitCode} className="mt-10 flex flex-col gap-4">

@@ -1,5 +1,10 @@
 // SQLite schema. All timestamps are unix epoch milliseconds.
 export const SCHEMA = /* sql */ `
+CREATE TABLE IF NOT EXISTS app_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id                 TEXT PRIMARY KEY,
   email              TEXT NOT NULL UNIQUE,

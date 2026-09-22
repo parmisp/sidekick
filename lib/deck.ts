@@ -1,6 +1,6 @@
 import { DECK_AFFINITY_SHARE, DECK_SIZE, PASS_COOLDOWN_MS } from "./config";
-import { db, newId } from "./db";
-import { getProfile } from "./profiles";
+import { all, get, newId, run, tx, type Executor } from "./db";
+import { getProfiles } from "./profiles";
 import type { Profile, UserRow } from "./types";
 import { MUTUALLY_VISIBLE_SQL, viewerParams } from "./visibility";
 
@@ -28,10 +28,8 @@ function eligibleParams(viewer: UserRow) {
   return { ...viewerParams(viewer), cooldownCutoff: Date.now() - PASS_COOLDOWN_MS };
 }
 
-export function isEligible(viewer: UserRow, targetId: string): boolean {
-  return !!db()
-    .prepare(`SELECT 1 FROM users u WHERE u.id = :targetId AND ${ELIGIBLE_SQL}`)
-    .get({ ...eligibleParams(viewer), targetId });
+export async function isEligible(viewer: UserRow, targetId: string): Promise<boolean> {
+  return !!(await get(`SELECT 1 AS ok FROM users u WHERE u.id = :targetId AND ${ELIGIBLE_SQL}`, { ...eligibleParams(viewer), targetId }));
 }
 
 export function affinityScore(
@@ -65,14 +63,14 @@ export type DeckCard = { profile: Profile; sharedTagIds: number[]; reappearance:
  * a discovery pick. Discovery picks come from outside the affinity slice so they
  * actually widen the pool.
  */
-export function buildDeck(viewer: UserRow): DeckCard[] {
-  const conn = db();
-  const candidates = conn
-    .prepare(`SELECT u.id, u.age, u.major, u.residence_status FROM users u WHERE ${ELIGIBLE_SQL}`)
-    .all(eligibleParams(viewer)) as CandidateRow[];
+export async function buildDeck(viewer: UserRow): Promise<DeckCard[]> {
+  const [candidates, tagRows, cooldownRows] = await Promise.all([
+    all<CandidateRow>(`SELECT u.id, u.age, u.major, u.residence_status FROM users u WHERE ${ELIGIBLE_SQL}`, eligibleParams(viewer)),
+    all<{ user_id: string; tag_id: number }>("SELECT user_id, tag_id FROM user_interests"),
+    all<{ swipee_id: string }>("SELECT swipee_id FROM pass_states WHERE swiper_id = ? AND state = 'cooldown_pending'", [viewer.id]),
+  ]);
   if (candidates.length === 0) return [];
 
-  const tagRows = conn.prepare("SELECT user_id, tag_id FROM user_interests").all() as { user_id: string; tag_id: number }[];
   const tagsByUser = new Map<string, number[]>();
   for (const r of tagRows) tagsByUser.set(r.user_id, [...(tagsByUser.get(r.user_id) ?? []), r.tag_id]);
   const viewerTags = new Set(tagsByUser.get(viewer.id) ?? []);
@@ -95,72 +93,73 @@ export function buildDeck(viewer: UserRow): DeckCard[] {
     if (next) deck.push(next);
   }
 
-  const reappearing = new Set(
-    (
-      conn
-        .prepare("SELECT swipee_id FROM pass_states WHERE swiper_id = ? AND state = 'cooldown_pending'")
-        .all(viewer.id) as { swipee_id: string }[]
-    ).map((r) => r.swipee_id),
-  );
-
-  return deck.flatMap((c) => {
-    const profile = getProfile(c.id);
-    if (!profile) return [];
-    return [{ profile, sharedTagIds: (tagsByUser.get(c.id) ?? []).filter((t) => viewerTags.has(t)), reappearance: reappearing.has(c.id) }];
-  });
+  const reappearing = new Set(cooldownRows.map((r) => r.swipee_id));
+  const profiles = await getProfiles(deck.map((c) => c.id));
+  return profiles.map((profile) => ({
+    profile,
+    sharedTagIds: (tagsByUser.get(profile.id) ?? []).filter((t) => viewerTags.has(t)),
+    reappearance: reappearing.has(profile.id),
+  }));
 }
 
-export function recordPass(viewerId: string, targetId: string) {
-  const conn = db();
+export async function recordPass(viewerId: string, targetId: string) {
   const now = Date.now();
-  conn.transaction(() => {
-    const existing = conn
-      .prepare("SELECT state, passed_at FROM pass_states WHERE swiper_id = ? AND swipee_id = ?")
-      .get(viewerId, targetId) as { state: string; passed_at: number } | undefined;
+  await tx(async (t) => {
+    const existing = await get<{ state: string; passed_at: number }>(
+      "SELECT state, passed_at FROM pass_states WHERE swiper_id = ? AND swipee_id = ?",
+      [viewerId, targetId],
+      t,
+    );
     if (!existing) {
-      conn
-        .prepare("INSERT INTO pass_states (swiper_id, swipee_id, state, passed_at) VALUES (?, ?, 'cooldown_pending', ?)")
-        .run(viewerId, targetId, now);
+      await run("INSERT INTO pass_states (swiper_id, swipee_id, state, passed_at) VALUES (?, ?, 'cooldown_pending', ?)", [viewerId, targetId, now], t);
     } else if (existing.state === "cooldown_pending" && existing.passed_at <= now - PASS_COOLDOWN_MS) {
       // This was the one re-appearance after cooldown — second pass is final.
-      conn
-        .prepare("UPDATE pass_states SET state = 'permanently_excluded', passed_at = ? WHERE swiper_id = ? AND swipee_id = ?")
-        .run(now, viewerId, targetId);
+      await run(
+        "UPDATE pass_states SET state = 'permanently_excluded', passed_at = ? WHERE swiper_id = ? AND swipee_id = ?",
+        [now, viewerId, targetId],
+        t,
+      );
     } else {
       return; // still in cooldown or already excluded: nothing to record (e.g. double tap)
     }
-    conn
-      .prepare("INSERT INTO swipes (id, swiper_id, swipee_id, direction, created_at) VALUES (?, ?, ?, 'pass', ?)")
-      .run(newId(), viewerId, targetId, now);
-  })();
+    await run("INSERT INTO swipes (id, swiper_id, swipee_id, direction, created_at) VALUES (?, ?, ?, 'pass', ?)", [newId(), viewerId, targetId, now], t);
+  });
 }
 
 /** Returns the match id if this friend swipe completed a mutual pair. */
-export function recordFriend(viewerId: string, targetId: string): string | null {
-  const conn = db();
-  return conn.transaction(() => {
-    conn
-      .prepare("INSERT INTO swipes (id, swiper_id, swipee_id, direction, created_at) VALUES (?, ?, ?, 'friend', ?)")
-      .run(newId(), viewerId, targetId, Date.now());
+export async function recordFriend(viewerId: string, targetId: string): Promise<string | null> {
+  return tx(async (t) => {
+    await run(
+      "INSERT INTO swipes (id, swiper_id, swipee_id, direction, created_at) VALUES (?, ?, ?, 'friend', ?)",
+      [newId(), viewerId, targetId, Date.now()],
+      t,
+    );
     // A friend swipe on a re-appearance resolves the earlier pass.
-    conn.prepare("DELETE FROM pass_states WHERE swiper_id = ? AND swipee_id = ?").run(viewerId, targetId);
-    const mutual = conn
-      .prepare("SELECT 1 FROM swipes WHERE swiper_id = ? AND swipee_id = ? AND direction = 'friend'")
-      .get(targetId, viewerId);
-    return mutual ? ensureMatch(viewerId, targetId, "swipe") : null;
-  })();
+    await run("DELETE FROM pass_states WHERE swiper_id = ? AND swipee_id = ?", [viewerId, targetId], t);
+    const mutual = await get(
+      "SELECT 1 AS ok FROM swipes WHERE swiper_id = ? AND swipee_id = ? AND direction = 'friend'",
+      [targetId, viewerId],
+      t,
+    );
+    return mutual ? ensureMatch(viewerId, targetId, "swipe", null, t) : null;
+  });
 }
 
-export function ensureMatch(a: string, b: string, source: "swipe" | "comment", sourceCommentId: string | null = null): string {
-  const conn = db();
+export async function ensureMatch(
+  a: string,
+  b: string,
+  source: "swipe" | "comment",
+  sourceCommentId: string | null,
+  ex: Executor,
+): Promise<string> {
   const [userA, userB] = a < b ? [a, b] : [b, a];
-  const existing = conn.prepare("SELECT id FROM matches WHERE user_a_id = ? AND user_b_id = ?").get(userA, userB) as
-    | { id: string }
-    | undefined;
+  const existing = await get<{ id: string }>("SELECT id FROM matches WHERE user_a_id = ? AND user_b_id = ?", [userA, userB], ex);
   if (existing) return existing.id;
   const id = newId();
-  conn
-    .prepare("INSERT INTO matches (id, user_a_id, user_b_id, source, source_comment_id, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(id, userA, userB, source, sourceCommentId, Date.now());
+  await run(
+    "INSERT INTO matches (id, user_a_id, user_b_id, source, source_comment_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [id, userA, userB, source, sourceCommentId, Date.now()],
+    ex,
+  );
   return id;
 }

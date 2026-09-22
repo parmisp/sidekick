@@ -5,7 +5,7 @@ import { getProfile } from "@/lib/profiles";
 
 export default async function MyProfilePage() {
   const user = await requireOnboardedUser();
-  const profile = getProfile(user.id)!;
+  const profile = (await getProfile(user.id))!;
   return (
     <div className="flex flex-col gap-4 pt-2">
       <div className="flex items-center justify-between px-1">

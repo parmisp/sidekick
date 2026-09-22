@@ -10,8 +10,8 @@ import { getProfile } from "@/lib/profiles";
 export default async function PersonPage({ params }: PageProps<"/people/[userId]">) {
   const { userId } = await params;
   const user = await requireOnboardedUser();
-  const match = listMatches(user).find((m) => m.otherId === userId);
-  const profile = match && getProfile(userId);
+  const match = (await listMatches(user)).find((m) => m.otherId === userId);
+  const profile = match && (await getProfile(userId));
   if (!match || !profile) notFound();
 
   return (

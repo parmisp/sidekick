@@ -1,53 +1,78 @@
-import { db } from "./db";
+import { all } from "./db";
 import type { Profile, ProfilePhoto, ProfilePrompt, ProfileTag, UserRow } from "./types";
 
-export function getProfile(userId: string): Profile | null {
-  const conn = db();
-  const user = conn.prepare("SELECT * FROM users WHERE id = ? AND name IS NOT NULL").get(userId) as UserRow | undefined;
-  if (!user) return null;
-  const photos = conn
-    .prepare("SELECT id, url, position FROM photos WHERE user_id = ? ORDER BY position")
-    .all(userId) as ProfilePhoto[];
-  const interests = conn
-    .prepare(
-      `SELECT t.id, t.name, t.category, t.emoji FROM user_interests ui
-       JOIN interest_tags t ON t.id = ui.tag_id WHERE ui.user_id = ? ORDER BY t.category, t.name`,
-    )
-    .all(userId) as ProfileTag[];
-  const customTag =
-    (conn.prepare("SELECT id, text FROM user_custom_tags WHERE user_id = ?").get(userId) as Profile["customTag"] | undefined) ?? null;
-  const prompts = conn
-    .prepare(
-      `SELECT up.id, up.prompt_id AS promptId, p.text AS question, up.answer_text AS answerText,
+const placeholders = (n: number) => Array(n).fill("?").join(",");
+
+/**
+ * Loads several profiles with 5 queries total (not 5 per profile) — matters when the
+ * database is remote. Returned in the same order as `ids`; unknown ids are skipped.
+ */
+export async function getProfiles(ids: string[]): Promise<Profile[]> {
+  if (ids.length === 0) return [];
+  const inList = placeholders(ids.length);
+  const [users, photos, interests, customTags, prompts] = await Promise.all([
+    all<UserRow>(`SELECT * FROM users WHERE id IN (${inList}) AND name IS NOT NULL`, ids),
+    all<ProfilePhoto & { userId: string }>(
+      `SELECT id, user_id AS userId, url, position FROM photos WHERE user_id IN (${inList}) ORDER BY position`,
+      ids,
+    ),
+    all<ProfileTag & { userId: string }>(
+      `SELECT ui.user_id AS userId, t.id, t.name, t.category, t.emoji FROM user_interests ui
+       JOIN interest_tags t ON t.id = ui.tag_id WHERE ui.user_id IN (${inList}) ORDER BY t.category, t.name`,
+      ids,
+    ),
+    all<{ id: string; userId: string; text: string }>(`SELECT id, user_id AS userId, text FROM user_custom_tags WHERE user_id IN (${inList})`, ids),
+    all<ProfilePrompt & { userId: string }>(
+      `SELECT up.id, up.user_id AS userId, up.prompt_id AS promptId, p.text AS question, up.answer_text AS answerText,
               up.image_url AS imageUrl, up.position
        FROM user_prompts up JOIN prompts p ON p.id = up.prompt_id
-       WHERE up.user_id = ? ORDER BY up.position`,
-    )
-    .all(userId) as ProfilePrompt[];
-  return {
-    id: user.id,
-    name: user.name!,
-    age: user.age!,
-    major: user.major!,
-    residenceStatus: user.residence_status,
-    photos,
-    interests,
-    customTag,
-    prompts,
-  };
+       WHERE up.user_id IN (${inList}) ORDER BY up.position`,
+      ids,
+    ),
+  ]);
+
+  const byUser = <T extends { userId: string }>(rows: T[], userId: string): Omit<T, "userId">[] =>
+    rows
+      .filter((r) => r.userId === userId)
+      .map((r) => {
+        const rest: Partial<T> = { ...r };
+        delete rest.userId;
+        return rest as Omit<T, "userId">;
+      });
+  const usersById = new Map(users.map((u) => [u.id, u]));
+
+  return ids.flatMap((id) => {
+    const user = usersById.get(id);
+    if (!user) return [];
+    const custom = customTags.find((c) => c.userId === id);
+    return [
+      {
+        id: user.id,
+        name: user.name!,
+        age: user.age!,
+        major: user.major!,
+        residenceStatus: user.residence_status,
+        photos: byUser(photos, id),
+        interests: byUser(interests, id),
+        customTag: custom ? { id: custom.id, text: custom.text } : null,
+        prompts: byUser(prompts, id),
+      },
+    ];
+  });
 }
 
-export function firstPhotoUrl(userId: string): string | null {
-  const row = db().prepare("SELECT url FROM photos WHERE user_id = ? ORDER BY position LIMIT 1").get(userId) as
-    | { url: string }
-    | undefined;
-  return row?.url ?? null;
+export async function getProfile(userId: string): Promise<Profile | null> {
+  return (await getProfiles([userId]))[0] ?? null;
 }
 
-export function getTagTaxonomy(): ProfileTag[] {
-  return db().prepare("SELECT id, name, category, emoji FROM interest_tags ORDER BY id").all() as ProfileTag[];
+export function getTagTaxonomy(): Promise<ProfileTag[]> {
+  return all<ProfileTag>("SELECT id, name, category, emoji FROM interest_tags ORDER BY id");
 }
 
-export function getPromptBank(): { id: number; text: string }[] {
-  return db().prepare("SELECT id, text FROM prompts ORDER BY id").all() as { id: number; text: string }[];
+export function getPromptBank(): Promise<{ id: number; text: string }[]> {
+  return all<{ id: number; text: string }>("SELECT id, text FROM prompts ORDER BY id");
+}
+
+export async function getUserTagIds(userId: string): Promise<number[]> {
+  return (await all<{ tag_id: number }>("SELECT tag_id FROM user_interests WHERE user_id = ?", [userId])).map((r) => r.tag_id);
 }

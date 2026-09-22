@@ -1,13 +1,12 @@
 import { logout } from "@/app/actions/auth";
 import { requireOnboardedUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { get } from "@/lib/db";
 import { BlockPhoneForm, DemoTools, GenderFilterSetting } from "./SettingsForms";
 
 export default async function SettingsPage() {
   const user = await requireOnboardedUser();
-  const { n: cooldowns } = db()
-    .prepare("SELECT COUNT(*) AS n FROM pass_states WHERE swiper_id = ? AND state = 'cooldown_pending'")
-    .get(user.id) as { n: number };
+  const cooldowns =
+    (await get<{ n: number }>("SELECT COUNT(*) AS n FROM pass_states WHERE swiper_id = ? AND state = 'cooldown_pending'", [user.id]))?.n ?? 0;
 
   return (
     <div className="flex flex-col gap-4 pt-2">
@@ -22,7 +21,7 @@ export default async function SettingsPage() {
       <section className="card p-5">
         <h2 className="font-serif text-xl font-semibold">Block a phone number</h2>
         <p className="mt-1 mb-4 text-sm text-ink-soft">
-          Keep someone you know off your radar. We never tell you whether a number is on Sidequest, and they&apos;re never told either.
+          Keep someone you know off your radar. We never tell you whether a number is on Sidekick, and they&apos;re never told either.
         </p>
         <BlockPhoneForm />
       </section>

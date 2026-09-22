@@ -6,7 +6,7 @@ import { timeAgo } from "@/lib/time";
 
 export default async function MatchesPage() {
   const user = await requireOnboardedUser();
-  const matches = listMatches(user);
+  const matches = await listMatches(user);
 
   if (matches.length === 0) {
     return (

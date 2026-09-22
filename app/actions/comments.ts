@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { assertOnboardedUser, getUserById } from "@/lib/auth";
 import { COMMENT_MAX } from "@/lib/config";
-import { db, newId } from "@/lib/db";
+import { get, newId, run, tx } from "@/lib/db";
 import { ensureMatch } from "@/lib/deck";
 import { getInboxItem } from "@/lib/inbox";
 import { containsProfanity } from "@/lib/moderation";
@@ -28,31 +28,29 @@ export async function addComment(
   if (body.length > COMMENT_MAX) return { ok: false, error: `Comments are limited to ${COMMENT_MAX} characters.` };
   // DEMO: word-list filter only. Comments need real moderation + reporting before launch.
   if (containsProfanity(body)) return { ok: false, error: "Keep it friendly — that comment didn't pass our filter." };
-  if (!TARGET_TABLE[targetType] || targetUserId === viewer.id || !canSee(viewer, targetUserId)) {
+  if (!TARGET_TABLE[targetType] || targetUserId === viewer.id || !(await canSee(viewer, targetUserId))) {
     return { ok: false, error: "You can't comment on this profile." };
   }
-  const owns = db().prepare(`SELECT 1 FROM ${TARGET_TABLE[targetType]} WHERE id = ? AND user_id = ?`).get(targetId, targetUserId);
+  const owns = await get(`SELECT 1 AS ok FROM ${TARGET_TABLE[targetType]} WHERE id = ? AND user_id = ?`, [targetId, targetUserId]);
   if (!owns) return { ok: false, error: "That content no longer exists." };
 
-  db()
-    .prepare(
-      "INSERT INTO comments (id, author_id, target_user_id, target_type, target_id, text, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    )
-    .run(newId(), viewer.id, targetUserId, targetType, targetId, body, Date.now());
+  await run(
+    "INSERT INTO comments (id, author_id, target_user_id, target_type, target_id, text, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [newId(), viewer.id, targetUserId, targetType, targetId, body, Date.now()],
+  );
   return { ok: true };
 }
 
 /** Replying creates a match straight away — no swipe needed — and returns the chat to open. */
 export async function replyToComment(commentId: string): Promise<ActionResult<{ matchId: string }>> {
   const viewer = await assertOnboardedUser();
-  const item = getInboxItem(viewer, commentId);
-  if (!item || !getUserById(item.authorId)) return { ok: false, error: "This comment is no longer available." };
-  const conn = db();
-  const matchId = conn.transaction(() => {
-    const id = ensureMatch(viewer.id, item.authorId, "comment", commentId);
-    conn.prepare("UPDATE comments SET replied_at = ?, is_read = 1 WHERE id = ?").run(Date.now(), commentId);
+  const item = await getInboxItem(viewer, commentId);
+  if (!item || !(await getUserById(item.authorId))) return { ok: false, error: "This comment is no longer available." };
+  const matchId = await tx(async (t) => {
+    const id = await ensureMatch(viewer.id, item.authorId, "comment", commentId, t);
+    await run("UPDATE comments SET replied_at = ?, is_read = 1 WHERE id = ?", [Date.now(), commentId], t);
     return id;
-  })();
+  });
   revalidatePath("/", "layout");
   return { ok: true, matchId };
 }
@@ -60,7 +58,7 @@ export async function replyToComment(commentId: string): Promise<ActionResult<{ 
 /** Silent: the author is never notified and swipe/deck state is untouched. */
 export async function dismissComment(commentId: string): Promise<ActionResult> {
   const viewer = await assertOnboardedUser();
-  db().prepare("UPDATE comments SET dismissed_at = ?, is_read = 1 WHERE id = ? AND target_user_id = ?").run(Date.now(), commentId, viewer.id);
+  await run("UPDATE comments SET dismissed_at = ?, is_read = 1 WHERE id = ? AND target_user_id = ?", [Date.now(), commentId, viewer.id]);
   revalidatePath("/", "layout");
   return { ok: true };
 }

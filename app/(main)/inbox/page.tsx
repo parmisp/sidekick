@@ -6,7 +6,7 @@ import { timeAgo } from "@/lib/time";
 
 export default async function InboxPage() {
   const user = await requireOnboardedUser();
-  const items = listInbox(user);
+  const items = await listInbox(user);
 
   if (items.length === 0) {
     return (

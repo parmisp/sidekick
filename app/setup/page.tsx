@@ -10,7 +10,7 @@ export default async function SetupPage() {
   if (!user.phone) redirect("/login/phone");
 
   // Editing an existing profile re-uses the same wizard, pre-filled.
-  const existing = user.profile_complete ? getProfile(user.id) : null;
+  const existing = user.profile_complete ? await getProfile(user.id) : null;
   const initial: ProfileInput | null = existing && {
     photos: [0, 1, 2, 3].map((i) => existing.photos.find((p) => p.position === i)?.url ?? null),
     name: existing.name,
@@ -24,5 +24,6 @@ export default async function SetupPage() {
     prompts: existing.prompts.map((p) => ({ promptId: p.promptId, answer: p.answerText, imageUrl: p.imageUrl })),
   };
 
-  return <ProfileWizard tags={getTagTaxonomy()} prompts={getPromptBank()} initial={initial} />;
+  const [tags, prompts] = await Promise.all([getTagTaxonomy(), getPromptBank()]);
+  return <ProfileWizard tags={tags} prompts={prompts} initial={initial} />;
 }

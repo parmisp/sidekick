@@ -1,8 +1,9 @@
 "use server";
 
+import type { InStatement } from "@libsql/client";
 import { getCurrentUser } from "@/lib/auth";
 import { CUSTOM_TAG_MAX, MAX_AGE, MAX_INTERESTS, MIN_AGE, MIN_INTERESTS, PHOTO_SLOTS, PROMPT_ANSWER_MAX, PROMPT_SLOTS } from "@/lib/config";
-import { db, newId } from "@/lib/db";
+import { db, get, newId } from "@/lib/db";
 import { simulateInterestInNewUser } from "@/lib/demo";
 import { containsProfanity } from "@/lib/moderation";
 import type { ActionResult, Gender, GenderFilterMode, ResidenceStatus } from "@/lib/types";
@@ -28,7 +29,7 @@ function validate(input: ProfileInput): string | null {
   if (input.photos.length !== PHOTO_SLOTS || input.photos.some((p) => !p || !isOurImage(p))) return "Add all 4 photos.";
   const name = input.name.trim();
   if (name.length < 1 || name.length > 40) return "Add your name (up to 40 characters).";
-  if (!Number.isInteger(input.age) || input.age < MIN_AGE || input.age > MAX_AGE) return `You need to be ${MIN_AGE} or older to use Sidequest.`;
+  if (!Number.isInteger(input.age) || input.age < MIN_AGE || input.age > MAX_AGE) return `You need to be ${MIN_AGE} or older to use Sidekick.`;
   if (input.major.trim().length < 2 || input.major.trim().length > 60) return "Add your major.";
   if (input.residenceStatus !== null && !["residence", "commuter"].includes(input.residenceStatus)) return "Invalid residence status.";
   if (!input.gender || !["male", "female", "rather_not_say"].includes(input.gender)) return "Choose a gender option.";
@@ -56,52 +57,44 @@ export async function saveProfile(input: ProfileInput): Promise<ActionResult> {
   const error = validate(input);
   if (error) return { ok: false, error };
 
-  const conn = db();
-  const validTags = conn
-    .prepare(`SELECT COUNT(*) AS n FROM interest_tags WHERE id IN (${input.tagIds.map(() => "?").join(",")})`)
-    .get(...input.tagIds) as { n: number };
-  if (validTags.n !== new Set(input.tagIds).size) return { ok: false, error: "Unknown interest tag." };
+  const tagIds = [...new Set(input.tagIds)];
+  const validTags = await get<{ n: number }>(`SELECT COUNT(*) AS n FROM interest_tags WHERE id IN (${tagIds.map(() => "?").join(",")})`, tagIds);
+  if (validTags?.n !== tagIds.length) return { ok: false, error: "Unknown interest tag." };
 
-  conn.transaction(() => {
-    conn
-      .prepare(
-        `UPDATE users SET name = ?, age = ?, major = ?, residence_status = ?, gender = ?, gender_filter_mode = ?, profile_complete = 1
-         WHERE id = ?`,
-      )
-      .run(input.name.trim(), input.age, input.major.trim(), input.residenceStatus, input.gender, input.genderFilterMode, user.id);
-
+  const custom = input.customTag.trim();
+  const statements: InStatement[] = [
+    {
+      sql: `UPDATE users SET name = ?, age = ?, major = ?, residence_status = ?, gender = ?, gender_filter_mode = ?, profile_complete = 1
+            WHERE id = ?`,
+      args: [input.name.trim(), input.age, input.major.trim(), input.residenceStatus, input.gender, input.genderFilterMode, user.id],
+    },
     // Upsert by slot so ids stay stable and existing comments keep pointing at the right content.
-    const upsertPhoto = conn.prepare(
-      `INSERT INTO photos (id, user_id, url, position) VALUES (?, ?, ?, ?)
-       ON CONFLICT (user_id, position) DO UPDATE SET url = excluded.url`,
-    );
-    input.photos.forEach((url, pos) => upsertPhoto.run(newId(), user.id, url, pos));
-
-    conn.prepare("DELETE FROM user_interests WHERE user_id = ?").run(user.id);
-    const insertInterest = conn.prepare("INSERT INTO user_interests (user_id, tag_id) VALUES (?, ?)");
-    [...new Set(input.tagIds)].forEach((t) => insertInterest.run(user.id, t));
-
-    const custom = input.customTag.trim();
-    if (custom) {
-      conn
-        .prepare(
-          `INSERT INTO user_custom_tags (id, user_id, text) VALUES (?, ?, ?)
-           ON CONFLICT (user_id) DO UPDATE SET text = excluded.text`,
-        )
-        .run(newId(), user.id, custom);
-    } else {
-      conn.prepare("DELETE FROM user_custom_tags WHERE user_id = ?").run(user.id);
-    }
-
-    const upsertPrompt = conn.prepare(
-      `INSERT INTO user_prompts (id, user_id, prompt_id, answer_text, image_url, position) VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (user_id, position) DO UPDATE SET prompt_id = excluded.prompt_id, answer_text = excluded.answer_text, image_url = excluded.image_url`,
-    );
-    input.prompts.forEach((p, pos) => upsertPrompt.run(newId(), user.id, p.promptId, p.answer.trim(), p.imageUrl, pos));
-  })();
+    ...input.photos.map((url, pos) => ({
+      sql: `INSERT INTO photos (id, user_id, url, position) VALUES (?, ?, ?, ?)
+            ON CONFLICT (user_id, position) DO UPDATE SET url = excluded.url`,
+      args: [newId(), user.id, url, pos],
+    })),
+    { sql: "DELETE FROM user_interests WHERE user_id = ?", args: [user.id] },
+    ...tagIds.map((t) => ({ sql: "INSERT INTO user_interests (user_id, tag_id) VALUES (?, ?)", args: [user.id, t] })),
+    custom
+      ? {
+          sql: `INSERT INTO user_custom_tags (id, user_id, text) VALUES (?, ?, ?)
+                ON CONFLICT (user_id) DO UPDATE SET text = excluded.text`,
+          args: [newId(), user.id, custom],
+        }
+      : { sql: "DELETE FROM user_custom_tags WHERE user_id = ?", args: [user.id] },
+    ...input.prompts.map((p, pos) => ({
+      sql: `INSERT INTO user_prompts (id, user_id, prompt_id, answer_text, image_url, position) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (user_id, position) DO UPDATE SET prompt_id = excluded.prompt_id, answer_text = excluded.answer_text, image_url = excluded.image_url`,
+      args: [newId(), user.id, p.promptId, p.answer.trim(), p.imageUrl, pos],
+    })),
+  ];
+  await (await db()).batch(statements, "write");
 
   // DEMO: give a solo tester some incoming likes and comments.
-  if (!user.demo_simulated && !user.is_seed) simulateInterestInNewUser({ ...user, gender: input.gender, gender_filter_mode: input.genderFilterMode });
+  if (!user.demo_simulated && !user.is_seed) {
+    await simulateInterestInNewUser({ ...user, profile_complete: 1, gender: input.gender, gender_filter_mode: input.genderFilterMode });
+  }
 
   return { ok: true };
 }

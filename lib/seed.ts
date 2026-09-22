@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { InStatement, InValue } from "@libsql/client";
 import crypto from "node:crypto";
 import { hashPhone, normalizePhone } from "./phone";
 import { placeholderUrl } from "./placeholder";
@@ -94,60 +94,58 @@ export function seedPhone(index: number) {
   return `+1 (555) 010-${String(index + 1).padStart(4, "0")}`;
 }
 
-export function seedDatabase(db: Database.Database) {
+/** All inserts for the demo seed, run by db.ts as one atomic batch. */
+export function seedStatements(): InStatement[] {
   const rand = mulberry32(42);
   const now = Date.now();
+  const out: InStatement[] = [];
+  const add = (sql: string, args: InValue[]) => out.push({ sql, args });
 
-  const run = db.transaction(() => {
-    const insertTag = db.prepare("INSERT INTO interest_tags (name, category, emoji) VALUES (?, ?, ?)");
-    for (const [category, tags] of Object.entries(TAG_TAXONOMY)) {
-      for (const [name, emoji] of tags) insertTag.run(name, category, emoji);
+  const tagByName = new Map<string, { id: number; emoji: string }>();
+  for (const [category, tags] of Object.entries(TAG_TAXONOMY)) {
+    for (const [name, emoji] of tags) {
+      const id = tagByName.size + 1;
+      tagByName.set(name, { id, emoji });
+      add("INSERT INTO interest_tags (id, name, category, emoji) VALUES (?, ?, ?, ?)", [id, name, category, emoji]);
     }
-    const insertPrompt = db.prepare("INSERT INTO prompts (id, text) VALUES (?, ?)");
-    PROMPT_BANK.forEach(([text], i) => insertPrompt.run(i + 1, text));
+  }
+  PROMPT_BANK.forEach(([text], i) => add("INSERT INTO prompts (id, text) VALUES (?, ?)", [i + 1, text]));
+  const answerCursor = PROMPT_BANK.map(() => 0);
 
-    const tagRows = db.prepare("SELECT id, name, emoji FROM interest_tags").all() as { id: number; name: string; emoji: string }[];
-    const tagByName = new Map(tagRows.map((t) => [t.name, t]));
-    const answerCursor = PROMPT_BANK.map(() => 0);
-
-    const insertUser = db.prepare(`INSERT INTO users
-      (id, email, phone, phone_hash, name, age, major, gender, residence_status, gender_filter_mode, profile_complete, is_seed, demo_simulated, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?)`);
-    const insertPhoto = db.prepare("INSERT INTO photos (id, user_id, url, position) VALUES (?, ?, ?, ?)");
-    const insertInterest = db.prepare("INSERT INTO user_interests (user_id, tag_id) VALUES (?, ?)");
-    const insertCustom = db.prepare("INSERT INTO user_custom_tags (id, user_id, text) VALUES (?, ?, ?)");
-    const insertUserPrompt = db.prepare(
-      "INSERT INTO user_prompts (id, user_id, prompt_id, answer_text, image_url, position) VALUES (?, ?, ?, ?, ?, ?)",
+  SEED_USERS.forEach((u, idx) => {
+    const id = crypto.randomUUID();
+    const email = `${u.name.toLowerCase().replace(/[^a-z ]/g, "").replace(/ /g, ".")}@sidekick-demo.edu`;
+    const phone = seedPhone(idx);
+    add(
+      `INSERT INTO users
+        (id, email, phone, phone_hash, name, age, major, gender, residence_status, gender_filter_mode, profile_complete, is_seed, demo_simulated, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?)`,
+      [id, email, phone, hashPhone(normalizePhone(phone)!), u.name, u.age, u.major, u.gender, u.residence, u.filter ?? "everyone", now - (idx + 1) * 86_400_000],
     );
 
-    SEED_USERS.forEach((u, idx) => {
-      const id = crypto.randomUUID();
-      const email = `${u.name.toLowerCase().replace(/[^a-z ]/g, "").replace(/ /g, ".")}@sidequest-demo.edu`;
-      const phone = seedPhone(idx);
-      insertUser.run(id, email, phone, hashPhone(normalizePhone(phone)!), u.name, u.age, u.major, u.gender, u.residence, u.filter ?? "everyone", now - (idx + 1) * 86_400_000);
+    const tags = u.tags.map((name) => {
+      const tag = tagByName.get(name);
+      if (!tag) throw new Error(`Unknown seed tag: ${name}`);
+      return tag;
+    });
+    const initials = u.name.split(" ").map((p) => p[0]).join("");
+    [initials, tags[0].emoji, tags[1].emoji, tags[2].emoji].forEach((text, pos) =>
+      add("INSERT INTO photos (id, user_id, url, position) VALUES (?, ?, ?, ?)", [crypto.randomUUID(), id, placeholderUrl(`u${idx}-${pos}`, text), pos]),
+    );
+    tags.forEach((t) => add("INSERT INTO user_interests (user_id, tag_id) VALUES (?, ?)", [id, t.id]));
+    if (u.custom) add("INSERT INTO user_custom_tags (id, user_id, text) VALUES (?, ?, ?)", [crypto.randomUUID(), id, u.custom]);
 
-      const tags = u.tags.map((name) => {
-        const tag = tagByName.get(name);
-        if (!tag) throw new Error(`Unknown seed tag: ${name}`);
-        return tag;
-      });
-      const initials = u.name.split(" ").map((p) => p[0]).join("");
-      [initials, tags[0].emoji, tags[1].emoji, tags[2].emoji].forEach((text, pos) =>
-        insertPhoto.run(crypto.randomUUID(), id, placeholderUrl(`u${idx}-${pos}`, text), pos),
-      );
-      tags.forEach((t) => insertInterest.run(id, t.id));
-      if (u.custom) insertCustom.run(crypto.randomUUID(), id, u.custom);
-
-      const promptIds = new Set<number>();
-      while (promptIds.size < 3) promptIds.add(Math.floor(rand() * PROMPT_BANK.length));
-      [...promptIds].forEach((p, pos) => {
-        const answers = PROMPT_BANK[p][1];
-        const answer = answers[answerCursor[p]++ % answers.length];
-        // Every third profile gets an image on its first prompt, to show the image card variant.
-        const image = pos === 0 && idx % 3 === 0 ? placeholderUrl(`p${idx}`, tags[3]?.emoji ?? "✨", "wide") : null;
-        insertUserPrompt.run(crypto.randomUUID(), id, p + 1, answer, image, pos);
-      });
+    const promptIds = new Set<number>();
+    while (promptIds.size < 3) promptIds.add(Math.floor(rand() * PROMPT_BANK.length));
+    [...promptIds].forEach((p, pos) => {
+      const answers = PROMPT_BANK[p][1];
+      const answer = answers[answerCursor[p]++ % answers.length];
+      // Every third profile gets an image on its first prompt, to show the image card variant.
+      const image = pos === 0 && idx % 3 === 0 ? placeholderUrl(`p${idx}`, tags[3]?.emoji ?? "✨", "wide") : null;
+      add("INSERT INTO user_prompts (id, user_id, prompt_id, answer_text, image_url, position) VALUES (?, ?, ?, ?, ?, ?)", [
+        crypto.randomUUID(), id, p + 1, answer, image, pos,
+      ]);
     });
   });
-  run();
+  return out;
 }

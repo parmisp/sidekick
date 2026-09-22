@@ -1,14 +1,14 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { db } from "./db";
+import { get } from "./db";
 import { getSecrets } from "./secrets";
 import type { UserRow } from "./types";
 
 // DEMO: a minimal HMAC-signed cookie session ("userId.expiresAt.signature").
 // Before launch: use a vetted session library, rotateable keys, server-side
 // session revocation, and rate limiting on login/verification.
-const COOKIE = "sq_session";
+const COOKIE = "sk_session";
 const MAX_AGE_S = 30 * 24 * 60 * 60;
 
 function sign(payload: string) {
@@ -44,8 +44,8 @@ export async function getSessionUserId(): Promise<string | null> {
   return userId;
 }
 
-export function getUserById(id: string): UserRow | null {
-  return (db().prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow | undefined) ?? null;
+export function getUserById(id: string): Promise<UserRow | null> {
+  return get<UserRow>("SELECT * FROM users WHERE id = ?", [id]);
 }
 
 export async function getCurrentUser(): Promise<UserRow | null> {

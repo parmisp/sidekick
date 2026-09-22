@@ -265,7 +265,7 @@ function BasicsStep({ form, update }: { form: ProfileInput; update: (p: Partial<
           <input className="field" value={form.major} maxLength={60} onChange={(e) => update({ major: e.target.value })} placeholder="Psychology" />
         </label>
       </div>
-      {form.age > 0 && form.age < MIN_AGE && <p className="-mt-3 text-sm text-accent-ink">Sidequest is for students {MIN_AGE} and over.</p>}
+      {form.age > 0 && form.age < MIN_AGE && <p className="-mt-3 text-sm text-accent-ink">Sidekick is for students {MIN_AGE} and over.</p>}
 
       <div>
         <span className="label">
