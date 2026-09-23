@@ -90,7 +90,7 @@ export function Deck({ cards }: { cards: DeckCard[] }) {
           onClick={() => act("friend")}
           disabled={pending}
           aria-label={`Be friends with ${first}`}
-          className="pointer-events-auto flex h-16 items-center gap-2 rounded-full bg-accent px-7 text-lg font-semibold text-white shadow-[0_10px_24px_rgb(255_111_69/0.45)] transition hover:brightness-105 active:scale-95"
+          className="pointer-events-auto flex h-16 items-center gap-2 rounded-full bg-accent px-7 text-lg font-semibold text-white shadow-[0_10px_24px_rgb(15_118_110/0.40)] transition hover:brightness-105 active:scale-95"
         >
           <WaveIcon className="size-6" /> Friend
         </button>

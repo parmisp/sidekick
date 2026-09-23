@@ -46,7 +46,7 @@ export function GenderFilterSetting({ initial, canUseSameGender }: { initial: Ge
       {!canUseSameGender && (
         <p className="mt-2 text-xs text-ink-soft">You chose &ldquo;rather not say&rdquo;, so the same-gender filter isn&apos;t available.</p>
       )}
-      {error && <p className="mt-2 text-sm text-accent-ink">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </>
   );
 }
@@ -84,7 +84,7 @@ export function BlockPhoneForm() {
         {pending ? "Blocking…" : "Block number"}
       </button>
       {message && <p className="rounded-2xl bg-green-soft px-4 py-3 text-sm text-green">{message}</p>}
-      {error && <p className="text-sm text-accent-ink">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </form>
   );
 }

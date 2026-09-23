@@ -8,7 +8,7 @@ export function TagPill({
   variant?: "interest" | "custom" | "meta";
 }) {
   const styles = {
-    interest: highlighted ? "bg-mustard text-ink ring-2 ring-mustard/40" : "bg-mustard-soft text-ink",
+    interest: highlighted ? "bg-mustard-soft text-accent-ink ring-1 ring-mustard" : "bg-green-soft text-ink",
     custom: "border border-dashed border-mustard bg-surface text-ink",
     meta: "bg-surface text-ink border border-line",
   }[variant];

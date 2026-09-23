@@ -24,7 +24,7 @@ export function InboxActions({ commentId, name }: { commentId: string; name: str
 
   return (
     <div className="fixed bottom-[76px] left-1/2 z-30 w-full max-w-[480px] -translate-x-1/2 bg-gradient-to-t from-bg via-bg/95 to-transparent px-4 pt-6 pb-3">
-      {error && <p className="mb-2 text-center text-sm text-accent-ink">{error}</p>}
+      {error && <p className="mb-2 text-center text-sm text-danger">{error}</p>}
       <div className="flex gap-3">
         <button type="button" className="btn-secondary flex-1" onClick={dismiss} disabled={pending}>
           Dismiss

@@ -2,18 +2,19 @@
 
 /* Design tokens — match the approved wireframe exactly. */
 :root {
-  --bg: #eff3ea;
+  --bg: #f7faf9;
   --surface: #ffffff;
-  --ink: #1e2b23;
-  --ink-soft: #5b6b60;
-  --accent: #ff6f45;
-  --accent-ink: #7a2e14;
-  --green: #3d6e5b;
-  --green-soft: #e4eee7;
-  --mustard: #f2b33d;
-  --mustard-soft: #fbebc9;
-  --line: #dde4d6;
-  --frame: #16201a;
+  --ink: #0f2a2e;
+  --ink-soft: #4f6e6b;      /* 5.6:1 on cards */
+  --accent: #0f766e;        /* primary actions: friend swipe, send, CTA buttons */
+  --accent-ink: #7a4b0a;    /* text on amber surfaces */
+  --green: #115e59;         /* active tab underline, tag category labels, "matched" states */
+  --green-soft: #e3f4f1;    /* prompt card backgrounds, active tab pill bg */
+  --mustard: #f5b83d;       /* accent: shared-interest highlights */
+  --mustard-soft: #fdf1da;
+  --line: #dce9e6;
+  --frame: #0b1f22;
+  --danger: #b3261e;        /* errors only — never the brand colours */
 }
 
 @theme inline {
@@ -28,6 +29,7 @@
   --color-mustard: var(--mustard);
   --color-mustard-soft: var(--mustard-soft);
   --color-line: var(--line);
+  --color-danger: var(--danger);
   --color-frame: var(--frame);
   --font-serif: var(--font-fraunces), Georgia, serif;
   --font-sans: var(--font-work-sans), system-ui, sans-serif;
@@ -49,7 +51,7 @@ body {
   @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[15px] font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45;
 }
 @utility btn-primary {
-  @apply btn bg-accent text-white shadow-[0_6px_16px_rgb(255_111_69/0.35)] hover:brightness-105;
+  @apply btn bg-accent text-white shadow-[0_6px_16px_rgb(15_118_110/0.30)] hover:brightness-105;
 }
 @utility btn-secondary {
   @apply btn border border-line bg-surface text-ink hover:bg-green-soft;

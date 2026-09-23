@@ -79,7 +79,7 @@ export function CommentSheet({
           </button>
         </div>
         <div className="mt-1 flex justify-between text-xs">
-          <span className="text-accent-ink">{error}</span>
+          <span className="text-danger">{error}</span>
           <span className="text-ink-soft">
             {text.length}/{COMMENT_MAX}
           </span>

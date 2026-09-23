@@ -124,7 +124,7 @@ export function ChatView({
       </div>
 
       <form onSubmit={send} className="border-t border-line bg-surface px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        {error && <p className="mb-2 text-sm text-accent-ink">{error}</p>}
+        {error && <p className="mb-2 text-sm text-danger">{error}</p>}
         <div className="flex items-center gap-2">
           <input
             className="field rounded-full"

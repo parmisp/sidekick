@@ -57,7 +57,7 @@ export function LoginForm() {
               required
             />
           </label>
-          {error && <p className="text-sm text-accent-ink">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           <button className="btn-primary" disabled={pending || !email}>
             {pending ? "Sending…" : "Send code"}
           </button>
@@ -81,7 +81,7 @@ export function LoginForm() {
               autoFocus
             />
           </label>
-          {error && <p className="text-sm text-accent-ink">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           <button className="btn-primary" disabled={pending || code.length !== 6}>
             {pending ? "Checking…" : "Verify"}
           </button>

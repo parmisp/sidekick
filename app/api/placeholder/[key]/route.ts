@@ -1,12 +1,12 @@
 // DEMO: generated SVG "photos" for seed profiles, so the demo needs no network access.
 const PALETTES: [string, string, string][] = [
-  ["#3D6E5B", "#E4EEE7", "#FFFFFF"],
-  ["#FF6F45", "#FBEBC9", "#FFFFFF"],
-  ["#F2B33D", "#FFF7E6", "#1E2B23"],
-  ["#7A2E14", "#FF6F45", "#FBEBC9"],
-  ["#5B6B60", "#DDE4D6", "#FFFFFF"],
-  ["#E4EEE7", "#3D6E5B", "#1E2B23"],
-  ["#FBEBC9", "#F2B33D", "#7A2E14"],
+  ["#0F766E", "#E3F4F1", "#FFFFFF"],
+  ["#115E59", "#5EC2B4", "#FFFFFF"],
+  ["#F5B83D", "#FDF1DA", "#0F2A2E"],
+  ["#7A4B0A", "#F5B83D", "#FDF1DA"],
+  ["#4F6E6B", "#DCE9E6", "#FFFFFF"],
+  ["#E3F4F1", "#0F766E", "#0F2A2E"],
+  ["#FDF1DA", "#F5B83D", "#7A4B0A"],
 ];
 
 function hash(s: string) {

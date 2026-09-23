@@ -102,7 +102,7 @@ export function ProfileWizard({
       </div>
 
       <footer className="fixed bottom-0 left-1/2 z-10 w-full max-w-[480px] -translate-x-1/2 border-t border-line bg-bg/95 px-5 pt-3 pb-5 backdrop-blur">
-        {error && <p className="mb-2 text-sm text-accent-ink">{error}</p>}
+        {error && <p className="mb-2 text-sm text-danger">{error}</p>}
         <button type="button" className="btn-primary w-full" disabled={!stepValid || saving} onClick={next}>
           {step < STEPS.length - 1 ? "Continue" : saving ? "Saving…" : editing ? "Save profile" : "Start exploring"}
         </button>
@@ -161,7 +161,7 @@ function ImagePicker({
           className="flex size-full flex-col items-center justify-center gap-1.5 border-2 border-dashed border-line bg-surface text-ink-soft transition hover:border-green hover:text-green"
         >
           {busy ? <span className="text-sm">Uploading…</span> : emptyLabel}
-          {error && <span className="px-2 text-center text-xs text-accent-ink">{error}</span>}
+          {error && <span className="px-2 text-center text-xs text-danger">{error}</span>}
         </button>
       )}
       <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
@@ -265,7 +265,7 @@ function BasicsStep({ form, update }: { form: ProfileInput; update: (p: Partial<
           <input className="field" value={form.major} maxLength={60} onChange={(e) => update({ major: e.target.value })} placeholder="Psychology" />
         </label>
       </div>
-      {form.age > 0 && form.age < MIN_AGE && <p className="-mt-3 text-sm text-accent-ink">Sidekick is for students {MIN_AGE} and over.</p>}
+      {form.age > 0 && form.age < MIN_AGE && <p className="-mt-3 text-sm text-danger">Sidekick is for students {MIN_AGE} and over.</p>}
 
       <div>
         <span className="label">
@@ -325,7 +325,7 @@ function InterestsStep({ tags, form, update }: { tags: ProfileTag[]; form: Profi
     <div className="flex flex-col gap-5">
       <div className="sticky top-[118px] z-[5] -mx-5 flex items-center justify-between bg-bg/95 px-5 py-2 backdrop-blur">
         <p className="text-ink-soft">Pick what you&apos;re into.</p>
-        <span className={`pill ${selected.size >= MIN_INTERESTS ? "bg-green text-white" : "bg-mustard-soft text-ink"}`}>
+        <span className={`pill ${selected.size >= MIN_INTERESTS ? "bg-green text-white" : "bg-mustard-soft text-accent-ink"}`}>
           {selected.size}/{MAX_INTERESTS} selected
         </span>
       </div>
@@ -345,7 +345,7 @@ function InterestsStep({ tags, form, update }: { tags: ProfileTag[]; form: Profi
                   disabled={!on && atMax}
                   aria-pressed={on}
                   className={`pill border transition disabled:opacity-40 ${
-                    on ? "border-mustard bg-mustard text-ink" : "border-line bg-surface text-ink hover:bg-mustard-soft"
+                    on ? "border-accent bg-accent text-white" : "border-line bg-surface text-ink hover:bg-green-soft"
                   }`}
                 >
                   {t.emoji} {t.name}

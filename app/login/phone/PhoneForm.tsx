@@ -43,7 +43,7 @@ export function PhoneForm() {
             autoFocus
           />
         </label>
-        {error && <p className="text-sm text-accent-ink">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         <button className="btn-primary" disabled={pending || phone.replace(/\D/g, "").length < 8}>
           {pending ? "Saving…" : "Continue"}
         </button>
