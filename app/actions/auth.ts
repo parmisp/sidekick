@@ -23,12 +23,19 @@ export async function verifyCode(email: string, code: string): Promise<ActionRes
   if (code.trim() !== DEMO_VERIFICATION_CODE) return { ok: false, error: "That code isn't right. (Demo mode: use 000000.)" };
 
   const normalized = email.trim().toLowerCase();
-  // INSERT OR IGNORE so two simultaneous first logins can't create duplicate accounts.
-  await run("INSERT OR IGNORE INTO users (id, email, created_at) VALUES (?, ?, ?)", [newId(), normalized, Date.now()]);
-  const user = (await get<{ id: string; phone: string | null; profile_complete: number }>(
-    "SELECT id, phone, profile_complete FROM users WHERE email = ?",
-    [normalized],
-  ))!;
+  let user: { id: string; phone: string | null; profile_complete: number };
+  try {
+    // INSERT OR IGNORE so two simultaneous first logins can't create duplicate accounts.
+    await run("INSERT OR IGNORE INTO users (id, email, created_at) VALUES (?, ?, ?)", [newId(), normalized, Date.now()]);
+    user = (await get<{ id: string; phone: string | null; profile_complete: number }>(
+      "SELECT id, phone, profile_complete FROM users WHERE email = ?",
+      [normalized],
+    ))!;
+  } catch (e) {
+    // Most likely the deployment has no database configured yet — see /api/health.
+    console.error("Sign-in failed", e);
+    return { ok: false, error: "This deployment isn't finished being set up (no database). Check /api/health." };
+  }
   await setSession(user.id);
   return { ok: true, next: !user.phone ? "/login/phone" : user.profile_complete ? "/discover" : "/setup" };
 }
