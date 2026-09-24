@@ -21,7 +21,6 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-4 pt-2">
       <h1 className="px-1 font-serif text-3xl font-semibold">Settings</h1>
-      <AccountActivation active />
 
       <section className="card p-5">
         <h2 className="font-serif text-xl font-semibold">Who you see</h2>
@@ -38,6 +37,8 @@ export default async function SettingsPage() {
       </section>
 
       <DemoTools cooldowns={cooldowns} />
+
+      <AccountActivation active />
 
       <section className="card flex items-center justify-between gap-3 p-5">
         <div className="min-w-0">
