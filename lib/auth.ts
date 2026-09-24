@@ -58,13 +58,13 @@ export async function requireOnboardedUser(): Promise<UserRow> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!user.phone) redirect("/login/phone");
-  if (!user.profile_complete) redirect("/setup");
+  if (!user.profile_complete || !user.main_campus || !user.degree) redirect("/setup");
   return user;
 }
 
 /** For server actions / route handlers: throws instead of redirecting. */
 export async function assertOnboardedUser(): Promise<UserRow> {
   const user = await getCurrentUser();
-  if (!user || !user.profile_complete) throw new Error("Not signed in");
+  if (!user || !user.profile_complete || !user.main_campus || !user.degree) throw new Error("Finish setting up your profile first.");
   return user;
 }

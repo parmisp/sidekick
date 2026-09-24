@@ -14,7 +14,7 @@ export default async function InboxItemPage({ params }: PageProps<"/inbox/[comme
   const { commentId } = await params;
   const user = await requireOnboardedUser();
   const item = await getInboxItem(user, commentId);
-  const author = item && (await getProfile(item.authorId));
+  const author = item && (await getProfile(item.authorId, user));
   if (!item || !author) notFound();
 
   if (!item.isRead) await run("UPDATE comments SET is_read = 1 WHERE id = ?", [item.id]);

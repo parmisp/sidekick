@@ -21,6 +21,11 @@ export const XIcon = ({ className }: IconProps) => (
     <path d="M18 6 6 18M6 6l12 12" />
   </svg>
 );
+export const CheckIcon = ({ className }: IconProps) => (
+  <svg {...base(className)}>
+    <path d="m5 12 4 4L19 6" />
+  </svg>
+);
 export const WaveIcon = ({ className }: IconProps) => (
   <svg {...base(className)}>
     <path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V11m0-1V4.5a1.5 1.5 0 0 1 3 0V10m0 0V5.5a1.5 1.5 0 0 1 3 0V12m0-3.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a7 7 0 0 1-5.6-2.8L3.2 15a1.5 1.5 0 0 1 2.4-1.8L7 15" />

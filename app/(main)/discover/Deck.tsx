@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { swipe } from "@/app/actions/swipe";
 import { CommentSheet } from "@/components/CommentSheet";
-import { WaveIcon, XIcon } from "@/components/icons";
+import { CheckIcon, XIcon } from "@/components/icons";
 import { ProfileView, type CommentTarget } from "@/components/ProfileView";
 import type { DeckCard } from "@/lib/deck";
 
@@ -92,7 +92,7 @@ export function Deck({ cards }: { cards: DeckCard[] }) {
           aria-label={`Be friends with ${first}`}
           className="pointer-events-auto flex h-16 items-center gap-2 rounded-full bg-accent px-7 text-lg font-semibold text-white shadow-[0_10px_24px_rgb(15_118_110/0.40)] transition hover:brightness-105 active:scale-95"
         >
-          <WaveIcon className="size-6" /> Friend
+          <CheckIcon className="size-6" /> Friend
         </button>
       </div>
 
@@ -110,7 +110,7 @@ export function Deck({ cards }: { cards: DeckCard[] }) {
           onClose={() => setCommentTarget(null)}
           onSent={() => {
             setCommentTarget(null);
-            setToast(`Comment sent. If ${first} replies, you'll be connected.`);
+            setToast(`${commentTarget.type === "prompt" ? "Prompt reply" : "Comment"} sent. If ${first} replies, you'll become friends.`);
           }}
         />
       )}

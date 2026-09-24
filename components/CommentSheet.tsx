@@ -23,13 +23,18 @@ export function CommentSheet({
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const isPromptReply = target.type === "prompt";
 
   const send = () =>
     startTransition(async () => {
       setError(null);
-      const res = await addComment(targetUserId, target.type, target.id, text);
-      if (res.ok) onSent();
-      else setError(res.error);
+      try {
+        const res = await addComment(targetUserId, target.type, target.id, text);
+        if (res.ok) onSent();
+        else setError(res.error);
+      } catch {
+        setError("Couldn't send your message. Please try again.");
+      }
     });
 
   return (
@@ -38,12 +43,13 @@ export function CommentSheet({
         className="w-full max-w-[480px] rounded-t-[28px] bg-surface px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-card"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label={`Comment on ${target.label}`}
+        aria-label={`${isPromptReply ? "Reply to prompt" : "Comment on"} ${target.label}`}
+        aria-modal="true"
       >
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" />
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold tracking-wide text-green uppercase">Commenting on</p>
+            <p className="text-xs font-semibold tracking-wide text-green uppercase">{isPromptReply ? `Reply to ${targetName.split(" ")[0]}'s prompt` : "Commenting on"}</p>
             <p className="font-serif text-lg leading-snug">{target.label}</p>
           </div>
           <button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-full hover:bg-green-soft" aria-label="Close">
@@ -56,7 +62,7 @@ export function CommentSheet({
           <p className="mt-3 rounded-2xl bg-green-soft px-4 py-3 font-serif text-ink">{target.preview}</p>
         ) : null}
         <p className="mt-3 text-sm text-ink-soft">
-          {targetName.split(" ")[0]} will see this in their inbox. If they reply, you&apos;re instantly connected.
+          {targetName.split(" ")[0]} will see this in their inbox. If they reply, you become friends and can chat — no swipe needed.
         </p>
         <div className="mt-3 flex items-end gap-2">
           <textarea
@@ -65,7 +71,9 @@ export function CommentSheet({
             maxLength={COMMENT_MAX}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Say something friendly…"
+            placeholder={isPromptReply ? "Reply to their answer or ask a question…" : "Say something friendly…"}
+            aria-label={isPromptReply ? "Your prompt reply" : "Your comment"}
+            disabled={pending}
             className="field resize-none"
           />
           <button
@@ -73,7 +81,7 @@ export function CommentSheet({
             className="btn-primary size-12 shrink-0 px-0"
             onClick={send}
             disabled={pending || !text.trim()}
-            aria-label="Send comment"
+            aria-label={isPromptReply ? "Send prompt reply" : "Send comment"}
           >
             <SendIcon />
           </button>

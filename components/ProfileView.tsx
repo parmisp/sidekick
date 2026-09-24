@@ -3,6 +3,7 @@ import type { CommentTargetType, Profile } from "@/lib/types";
 import { CommentIcon } from "./icons";
 import { PromptCard } from "./PromptCard";
 import { TagPill } from "./TagPill";
+import { campusName } from "@/lib/academics";
 
 export type CommentTarget = { type: CommentTargetType; id: string; label: string; preview?: string };
 
@@ -22,16 +23,21 @@ export function ProfileView({
 }) {
   const [hero, ...restPhotos] = profile.photos;
   const shared = new Set(sharedTagIds);
+  const study = [profile.major, profile.degree].filter(Boolean).join(" · ");
+  const campus = campusName(profile.mainCampus);
 
   const commentButton = (target: CommentTarget) =>
     onComment ? (
       <button
         type="button"
         onClick={() => onComment(target)}
-        aria-label={`Comment on ${target.label}`}
-        className="grid size-11 place-items-center rounded-full bg-surface text-accent shadow-card transition hover:scale-105 active:scale-95"
+        aria-label={target.type === "prompt" ? `Reply to prompt: ${target.label}` : `Comment on ${target.label}`}
+        className={target.type === "prompt"
+          ? "inline-flex min-h-11 items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-semibold text-accent shadow-card transition hover:bg-green-soft active:scale-95"
+          : "grid size-11 place-items-center rounded-full bg-surface text-accent shadow-card transition hover:scale-105 active:scale-95"}
       >
         <CommentIcon />
+        {target.type === "prompt" && <span>Reply to prompt</span>}
       </button>
     ) : null;
 
@@ -67,7 +73,7 @@ export function ProfileView({
             <h2 className="font-serif text-4xl font-semibold">
               {profile.name.split(" ")[0]}, <span className="font-normal">{profile.age}</span>
             </h2>
-            <p className="mt-1 text-[15px] text-white/90">{profile.major}</p>
+            <p className="mt-1 text-[15px] text-white/90">{study}</p>
           </div>
           <div className="absolute top-3 right-3">
             {commentButton({ type: "photo", id: hero.id, label: `${profile.name}'s photo`, preview: hero.url })}
@@ -77,9 +83,11 @@ export function ProfileView({
 
       <div className="card flex flex-col gap-3 p-5">
         <div className="flex flex-wrap gap-2">
-          <TagPill variant="meta">🎓 {profile.major}</TagPill>
+          <TagPill variant="meta">🎓 {study}</TagPill>
+          {campus && <TagPill variant="meta">🏫 {campus} campus</TagPill>}
+          {profile.hometown && <TagPill variant="meta">📍 From {profile.hometown}</TagPill>}
           {profile.residenceStatus && (
-            <TagPill variant="meta">{profile.residenceStatus === "residence" ? "🏠 Lives in residence" : "🚌 Commuter"}</TagPill>
+            <TagPill variant="meta">{profile.residenceStatus === "residence" ? `🏠 ${profile.residenceName ?? "Lives in residence"}` : "🚌 Commuter"}</TagPill>
           )}
         </div>
         <p className="text-xs font-semibold tracking-wide text-green uppercase">Into</p>

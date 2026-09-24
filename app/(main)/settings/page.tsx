@@ -1,7 +1,8 @@
+import { BlockPhoneForm } from "@/components/BlockPhoneForm";
 import { logout } from "@/app/actions/auth";
 import { requireOnboardedUser } from "@/lib/auth";
 import { get } from "@/lib/db";
-import { BlockPhoneForm, DemoTools, GenderFilterSetting } from "./SettingsForms";
+import { DemoTools, GenderFilterSetting } from "./SettingsForms";
 
 export default async function SettingsPage() {
   const user = await requireOnboardedUser();

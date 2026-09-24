@@ -11,7 +11,7 @@ export default async function PersonPage({ params }: PageProps<"/people/[userId]
   const { userId } = await params;
   const user = await requireOnboardedUser();
   const match = (await listMatches(user)).find((m) => m.otherId === userId);
-  const profile = match && (await getProfile(userId));
+  const profile = match && (await getProfile(userId, user));
   if (!match || !profile) notFound();
 
   return (

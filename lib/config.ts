@@ -15,12 +15,16 @@ export const ALLOWED_EMAIL_DOMAINS: string[] = (
   .map((d) => d.trim().toLowerCase().replace(/^\./, ""))
   .filter(Boolean);
 
-// DEMO: every verification code is accepted if it equals this value.
+// Only this shared demo account bypasses email delivery.
+export const DEMO_EMAIL = "demo@my.yorku.ca";
 export const DEMO_VERIFICATION_CODE = "000000";
 
 export const PASS_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 export const DECK_SIZE = 20;
 export const DECK_AFFINITY_SHARE = 0.75;
+
+// Compatibility weights total 100; campus is a preference, never an eligibility filter.
+export const AFFINITY_WEIGHTS = { campus: 40, interests: 25, major: 20, age: 10, residence: 5 } as const;
 
 export const MIN_INTERESTS = 3;
 export const MAX_INTERESTS = 5;

@@ -11,7 +11,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[matchId]">)
   const { matchId } = await params;
   const user = await requireOnboardedUser();
   const match = await getMatchForViewer(user, matchId);
-  const other = match && (await getProfile(match.otherId));
+  const other = match && (await getProfile(match.otherId, user));
   if (!match || !other) notFound();
 
   const first = other.name.split(" ")[0];

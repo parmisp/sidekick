@@ -5,6 +5,18 @@ CREATE TABLE IF NOT EXISTS app_meta (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS email_verifications (
+  email          TEXT PRIMARY KEY,
+  nonce          TEXT NOT NULL,
+  code_hash      TEXT NOT NULL,
+  expires_at     INTEGER NOT NULL,
+  attempts       INTEGER NOT NULL DEFAULT 0,
+  delivered      INTEGER NOT NULL DEFAULT 0,
+  sent_at        INTEGER NOT NULL,
+  window_start   INTEGER NOT NULL,
+  send_count     INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id                 TEXT PRIMARY KEY,
   email              TEXT NOT NULL UNIQUE,
@@ -13,8 +25,12 @@ CREATE TABLE IF NOT EXISTS users (
   name               TEXT,
   age                INTEGER,
   major              TEXT,
+  main_campus        TEXT,
+  degree             TEXT,
+  hometown           TEXT,
   gender             TEXT CHECK (gender IN ('male', 'female', 'rather_not_say')),
   residence_status   TEXT CHECK (residence_status IN ('residence', 'commuter')),
+  residence_id       TEXT,
   gender_filter_mode TEXT NOT NULL DEFAULT 'everyone' CHECK (gender_filter_mode IN ('everyone', 'same_gender')),
   profile_complete   INTEGER NOT NULL DEFAULT 0,
   is_seed            INTEGER NOT NULL DEFAULT 0,

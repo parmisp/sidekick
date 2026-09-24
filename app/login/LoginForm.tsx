@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { sendCode, verifyCode } from "@/app/actions/auth";
 import { DemoBanner } from "@/components/DemoBanner";
 import { Logo } from "@/components/Logo";
+import { DEMO_EMAIL } from "@/lib/config";
 
 export function LoginForm() {
   const router = useRouter();
@@ -12,25 +13,44 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const isDemo = email.trim().toLowerCase() === DEMO_EMAIL;
+
+  const requestCode = () => {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      try {
+        const res = await sendCode(email);
+        if (res.ok) {
+          setCode("");
+          setStep("code");
+          setNotice("A new code has been sent. Check your inbox and spam folder.");
+        } else setError(res.error);
+      } catch {
+        setError("Couldn't connect. Please try again.");
+      }
+    });
+  };
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    startTransition(async () => {
-      const res = await sendCode(email);
-      if (res.ok) setStep("code");
-      else setError(res.error);
-    });
+    requestCode();
   };
 
   const submitCode = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     startTransition(async () => {
-      const res = await verifyCode(email, code);
-      if (res.ok) router.push(res.next);
-      else setError(res.error);
+      try {
+        const res = await verifyCode(email, code);
+        if (res.ok) router.push(res.next);
+        else setError(res.error);
+      } catch {
+        setError("Couldn't connect. Please try again.");
+      }
     });
   };
 
@@ -65,11 +85,15 @@ export function LoginForm() {
         </form>
       ) : (
         <form onSubmit={submitCode} className="mt-10 flex flex-col gap-4">
-          <DemoBanner>
-            No email is sent. Use code <strong className="font-mono tracking-widest">000000</strong>.
-          </DemoBanner>
+          {isDemo ? (
+            <DemoBanner>
+              Demo account: use code <strong className="font-mono tracking-widest">000000</strong>. No email is sent.
+            </DemoBanner>
+          ) : (
+            <p className="text-sm text-ink-soft">Enter the 6-digit code from your email. It expires in 10 minutes.</p>
+          )}
           <label>
-            <span className="label">Code sent to {email}</span>
+            <span className="label">{isDemo ? "Demo code for" : "Code sent to"} {email.trim().toLowerCase()}</span>
             <input
               className="field text-center font-mono text-2xl tracking-[0.5em]"
               inputMode="numeric"
@@ -82,10 +106,21 @@ export function LoginForm() {
             />
           </label>
           {error && <p className="text-sm text-danger">{error}</p>}
+          {!isDemo && notice && <p role="status" className="text-sm text-ink-soft">{notice}</p>}
           <button className="btn-primary" disabled={pending || code.length !== 6}>
             {pending ? "Checking…" : "Verify"}
           </button>
-          <button type="button" className="btn-ghost" onClick={() => setStep("email")}>
+          {!isDemo && (
+            <button type="button" className="btn-ghost" disabled={pending} onClick={requestCode}>
+              Resend code
+            </button>
+          )}
+          <button type="button" className="btn-ghost" disabled={pending} onClick={() => {
+            setStep("email");
+            setCode("");
+            setError(null);
+            setNotice(null);
+          }}>
             Use a different email
           </button>
         </form>

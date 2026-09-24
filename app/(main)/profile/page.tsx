@@ -2,10 +2,12 @@ import Link from "next/link";
 import { ProfileView } from "@/components/ProfileView";
 import { requireOnboardedUser } from "@/lib/auth";
 import { getProfile } from "@/lib/profiles";
+import { DEMO_EMAIL } from "@/lib/config";
+import { RestartDemo } from "@/components/RestartDemo";
 
 export default async function MyProfilePage() {
   const user = await requireOnboardedUser();
-  const profile = (await getProfile(user.id))!;
+  const profile = (await getProfile(user.id, user))!;
   return (
     <div className="flex flex-col gap-4 pt-2">
       <div className="flex items-center justify-between px-1">
@@ -17,6 +19,7 @@ export default async function MyProfilePage() {
           Edit
         </Link>
       </div>
+      {user.email === DEMO_EMAIL && <RestartDemo />}
       <ProfileView profile={profile} />
     </div>
   );

@@ -13,14 +13,14 @@ export default async function InboxPage() {
       <div className="card mt-6 flex flex-col items-center gap-2 px-6 py-12 text-center">
         <p className="text-5xl">💬</p>
         <h2 className="font-serif text-2xl font-semibold">No comments yet</h2>
-        <p className="text-ink-soft">When someone comments on your photos, prompts or tag, it shows up here.</p>
+        <p className="text-ink-soft">Prompt replies and comments on your photos or tag show up here. Reply to become friends.</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3 pt-2">
-      <p className="px-1 text-sm text-ink-soft">People who reached out. Reply to connect, or dismiss. They won&apos;t be told.</p>
+      <p className="px-1 text-sm text-ink-soft">People who reached out. Reply to become friends, or dismiss. They won&apos;t be told.</p>
       {items.map((item) => (
         <Link key={item.id} href={`/inbox/${item.id}`} className="card flex gap-3 p-4 transition hover:shadow-lg active:scale-[0.99]">
           <div className="relative shrink-0">

@@ -20,15 +20,15 @@ export function PromptCard({
           <p className="text-xs font-semibold tracking-wide text-ink-soft uppercase">{question}</p>
           <p className="mt-1.5 font-serif text-xl leading-snug text-ink">{answer}</p>
         </div>
-        {action && <div className="absolute right-3 bottom-3">{action}</div>}
+        {action && <div className="flex justify-end px-5 pb-5">{action}</div>}
       </div>
     );
   }
   return (
     <div className="relative rounded-3xl bg-green-soft px-5 pt-5 pb-6">
       <p className="text-xs font-semibold tracking-wide text-green uppercase">{question}</p>
-      <p className="mt-2 pr-8 font-serif text-2xl leading-snug text-ink">{answer}</p>
-      {action && <div className="absolute right-3 bottom-3">{action}</div>}
+      <p className="mt-2 font-serif text-2xl leading-snug text-ink">{answer}</p>
+      {action && <div className="mt-4 flex justify-end">{action}</div>}
     </div>
   );
 }

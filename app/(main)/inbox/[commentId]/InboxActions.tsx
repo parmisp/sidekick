@@ -25,12 +25,13 @@ export function InboxActions({ commentId, name }: { commentId: string; name: str
   return (
     <div className="fixed bottom-[76px] left-1/2 z-30 w-full max-w-[480px] -translate-x-1/2 bg-gradient-to-t from-bg via-bg/95 to-transparent px-4 pt-6 pb-3">
       {error && <p className="mb-2 text-center text-sm text-danger">{error}</p>}
+      <p className="mb-2 text-center text-xs text-ink-soft">Replying makes you friends with {name} and opens your chat.</p>
       <div className="flex gap-3">
         <button type="button" className="btn-secondary flex-1" onClick={dismiss} disabled={pending}>
           Dismiss
         </button>
         <button type="button" className="btn-primary flex-[2]" onClick={reply} disabled={pending}>
-          Reply to {name}
+          Reply &amp; become friends
         </button>
       </div>
     </div>

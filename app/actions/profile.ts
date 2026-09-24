@@ -1,11 +1,13 @@
 "use server";
 
 import type { InStatement } from "@libsql/client";
+import { isCampus, isDegree, type Campus, type Degree } from "@/lib/academics";
 import { getCurrentUser } from "@/lib/auth";
 import { CUSTOM_TAG_MAX, MAX_AGE, MAX_INTERESTS, MIN_AGE, MIN_INTERESTS, PHOTO_SLOTS, PROMPT_ANSWER_MAX, PROMPT_SLOTS } from "@/lib/config";
 import { db, get, newId } from "@/lib/db";
 import { simulateInterestInNewUser } from "@/lib/demo";
 import { containsProfanity } from "@/lib/moderation";
+import { residenceName } from "@/lib/residences";
 import type { ActionResult, Gender, GenderFilterMode, ResidenceStatus } from "@/lib/types";
 
 export type ProfileInput = {
@@ -13,7 +15,11 @@ export type ProfileInput = {
   name: string;
   age: number;
   major: string;
+  mainCampus: Campus | null;
+  degree: Degree | null;
+  hometown: string;
   residenceStatus: ResidenceStatus | null;
+  residenceId: string | null;
   gender: Gender | null;
   genderFilterMode: GenderFilterMode;
   tagIds: number[];
@@ -31,7 +37,11 @@ function validate(input: ProfileInput): string | null {
   if (name.length < 1 || name.length > 40) return "Add your name (up to 40 characters).";
   if (!Number.isInteger(input.age) || input.age < MIN_AGE || input.age > MAX_AGE) return `You need to be ${MIN_AGE} or older to use Sidekick.`;
   if (input.major.trim().length < 2 || input.major.trim().length > 60) return "Add your major.";
+  if (!isCampus(input.mainCampus)) return "Choose your main campus.";
+  if (!isDegree(input.degree)) return "Choose your degree, or select Other or Undecided.";
+  if (typeof input.hometown !== "string" || input.hometown.trim().length > 80) return "Keep your hometown to 80 characters or fewer.";
   if (input.residenceStatus !== null && !["residence", "commuter"].includes(input.residenceStatus)) return "Invalid residence status.";
+  if (input.residenceStatus === "residence" && input.residenceId != null && !residenceName(input.residenceId)) return "Choose a residence from the list, or leave it blank.";
   if (!input.gender || !["male", "female", "rather_not_say"].includes(input.gender)) return "Choose a gender option.";
   if (!["everyone", "same_gender"].includes(input.genderFilterMode)) return "Invalid filter.";
   const tags = new Set(input.tagIds);
@@ -46,7 +56,7 @@ function validate(input: ProfileInput): string | null {
     if (p.answer.trim().length > PROMPT_ANSWER_MAX) return `Prompt answers are limited to ${PROMPT_ANSWER_MAX} characters.`;
     if (p.imageUrl && !isOurImage(p.imageUrl)) return "Invalid prompt image.";
   }
-  const texts = [name, input.major, input.customTag, ...input.prompts.map((p) => p.answer)];
+  const texts = [name, input.major, input.hometown, input.customTag, ...input.prompts.map((p) => p.answer)];
   if (texts.some(containsProfanity)) return "Some of your text didn't pass our content filter. Please rephrase.";
   return null;
 }
@@ -64,9 +74,11 @@ export async function saveProfile(input: ProfileInput): Promise<ActionResult> {
   const custom = input.customTag.trim();
   const statements: InStatement[] = [
     {
-      sql: `UPDATE users SET name = ?, age = ?, major = ?, residence_status = ?, gender = ?, gender_filter_mode = ?, profile_complete = 1
+      sql: `UPDATE users SET name = ?, age = ?, major = ?, main_campus = ?, degree = ?, hometown = ?, residence_status = ?, residence_id = ?, gender = ?, gender_filter_mode = ?, profile_complete = 1
             WHERE id = ?`,
-      args: [input.name.trim(), input.age, input.major.trim(), input.residenceStatus, input.gender, input.genderFilterMode, user.id],
+      args: [input.name.trim(), input.age, input.major.trim(), input.mainCampus, input.degree, input.hometown.trim() || null, input.residenceStatus,
+        input.residenceStatus === "residence" ? input.residenceId ?? null : null,
+        input.gender, input.genderFilterMode, user.id],
     },
     // Upsert by slot so ids stay stable and existing comments keep pointing at the right content.
     ...input.photos.map((url, pos) => ({

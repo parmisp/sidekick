@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { blockPhone, demoFastForwardCooldowns, demoResetSwipes, updateGenderFilter } from "@/app/actions/settings";
+import { demoFastForwardCooldowns, demoResetSwipes, updateGenderFilter } from "@/app/actions/settings";
 import type { GenderFilterMode } from "@/lib/types";
 
 export function GenderFilterSetting({ initial, canUseSameGender }: { initial: GenderFilterMode; canUseSameGender: boolean }) {
@@ -48,44 +48,6 @@ export function GenderFilterSetting({ initial, canUseSameGender }: { initial: Ge
       )}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </>
-  );
-}
-
-export function BlockPhoneForm() {
-  const [phone, setPhone] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage(null);
-    setError(null);
-    startTransition(async () => {
-      const res = await blockPhone(phone);
-      if (res.ok) {
-        setMessage(res.message);
-        setPhone("");
-      } else setError(res.error);
-    });
-  };
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-3">
-      <input
-        className="field"
-        type="tel"
-        inputMode="tel"
-        placeholder="(416) 555-0123"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-      />
-      <button className="btn-primary" disabled={pending || !phone.trim()}>
-        {pending ? "Blocking…" : "Block number"}
-      </button>
-      {message && <p className="rounded-2xl bg-green-soft px-4 py-3 text-sm text-green">{message}</p>}
-      {error && <p className="text-sm text-danger">{error}</p>}
-    </form>
   );
 }
 

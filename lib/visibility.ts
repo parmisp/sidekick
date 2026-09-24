@@ -11,6 +11,8 @@ import type { UserRow } from "./types";
  */
 export const MUTUALLY_VISIBLE_SQL = /* sql */ `
   u.profile_complete = 1
+  AND u.main_campus IS NOT NULL
+  AND u.degree IS NOT NULL
   AND u.id != :viewerId
   AND NOT EXISTS (SELECT 1 FROM phone_blocks b WHERE b.blocker_id = :viewerId AND b.blocked_phone_hash = u.phone_hash)
   AND NOT EXISTS (SELECT 1 FROM phone_blocks b WHERE b.blocker_id = u.id AND b.blocked_phone_hash = :viewerPhoneHash)

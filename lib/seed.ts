@@ -1,5 +1,6 @@
 import type { InStatement, InValue } from "@libsql/client";
 import crypto from "node:crypto";
+import type { Campus, Degree } from "./academics";
 import { hashPhone, normalizePhone } from "./phone";
 import { placeholderUrl } from "./placeholder";
 
@@ -94,6 +95,18 @@ export function seedPhone(index: number) {
   return `+1 (555) 010-${String(index + 1).padStart(4, "0")}`;
 }
 
+/** Fictional academic details for demo profiles, also used to upgrade older seeds. */
+export function seedAcademics(major: string): { campus: Campus; degree: Degree } {
+  const campus = ["French Studies", "Linguistics"].includes(major) ? "glendon"
+    : ["Computer Science", "Accounting", "Marketing"].includes(major) ? "markham" : "keele";
+  const degree = major.includes("Engineering") ? "BEng"
+    : ["Computer Science", "Biology", "Kinesiology", "Environmental Science", "Public Health"].includes(major) ? "BSc"
+    : major === "Nursing" ? "BScN"
+    : ["Accounting", "Marketing"].includes(major) ? "BCom"
+    : ["Fine Arts", "Music", "Film Studies"].includes(major) ? "BFA" : "BA";
+  return { campus, degree };
+}
+
 /** All inserts for the demo seed, run by db.ts as one atomic batch. */
 export function seedStatements(): InStatement[] {
   const rand = mulberry32(42);
@@ -116,11 +129,12 @@ export function seedStatements(): InStatement[] {
     const id = crypto.randomUUID();
     const email = `${u.name.toLowerCase().replace(/[^a-z ]/g, "").replace(/ /g, ".")}@sidekick-demo.edu`;
     const phone = seedPhone(idx);
+    const academic = seedAcademics(u.major);
     add(
       `INSERT INTO users
-        (id, email, phone, phone_hash, name, age, major, gender, residence_status, gender_filter_mode, profile_complete, is_seed, demo_simulated, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?)`,
-      [id, email, phone, hashPhone(normalizePhone(phone)!), u.name, u.age, u.major, u.gender, u.residence, u.filter ?? "everyone", now - (idx + 1) * 86_400_000],
+        (id, email, phone, phone_hash, name, age, major, main_campus, degree, gender, residence_status, gender_filter_mode, profile_complete, is_seed, demo_simulated, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?)`,
+      [id, email, phone, hashPhone(normalizePhone(phone)!), u.name, u.age, u.major, academic.campus, academic.degree, u.gender, u.residence, u.filter ?? "everyone", now - (idx + 1) * 86_400_000],
     );
 
     const tags = u.tags.map((name) => {

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getProfile, getPromptBank, getTagTaxonomy } from "@/lib/profiles";
 import type { ProfileInput } from "@/app/actions/profile";
 import { ProfileWizard } from "./ProfileWizard";
+import { DEMO_EMAIL } from "@/lib/config";
 
 export default async function SetupPage() {
   const user = await getCurrentUser();
@@ -16,7 +17,11 @@ export default async function SetupPage() {
     name: existing.name,
     age: existing.age,
     major: existing.major,
+    mainCampus: existing.mainCampus,
+    degree: existing.degree,
+    hometown: existing.hometown ?? "",
     residenceStatus: existing.residenceStatus,
+    residenceId: user.residence_status === "residence" ? user.residence_id : null,
     gender: user.gender,
     genderFilterMode: user.gender_filter_mode,
     tagIds: existing.interests.map((t) => t.id),
@@ -25,5 +30,5 @@ export default async function SetupPage() {
   };
 
   const [tags, prompts] = await Promise.all([getTagTaxonomy(), getPromptBank()]);
-  return <ProfileWizard tags={tags} prompts={prompts} initial={initial} />;
+  return <ProfileWizard key={user.id} tags={tags} prompts={prompts} initial={initial} isDemo={user.email === DEMO_EMAIL} />;
 }

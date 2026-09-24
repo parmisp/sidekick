@@ -2,7 +2,7 @@ import { createClient, type Client, type InArgs, type Transaction } from "@libsq
 import fs from "node:fs";
 import path from "node:path";
 import { SCHEMA } from "./schema";
-import { seedStatements } from "./seed";
+import { seedAcademics, seedStatements } from "./seed";
 
 // Local dev: a SQLite file in ./data (no setup). Deployed (e.g. Vercel, whose disk is
 // read-only): a hosted Turso database via TURSO_DATABASE_URL + TURSO_AUTH_TOKEN.
@@ -29,6 +29,20 @@ async function init(): Promise<Client> {
   await client.execute("PRAGMA foreign_keys = ON");
   await client.executeMultiple(SCHEMA);
 
+  // Add optional profile fields to older databases without replacing any data.
+  const columns = (await client.execute("PRAGMA table_info(users)")).rows.map((column) => column.name);
+  for (const name of ["hometown", "residence_id", "main_campus", "degree"] as const) {
+    if (!columns.includes(name)) {
+      try {
+        await client.execute(`ALTER TABLE users ADD COLUMN ${name} TEXT`);
+      } catch (error) {
+        // Another server may have applied the same additive migration first.
+        const current = await client.execute("PRAGMA table_info(users)");
+        if (!current.rows.some((column) => column.name === name)) throw error;
+      }
+    }
+  }
+
   const seeded = await client.execute("SELECT 1 FROM app_meta WHERE key = 'seeded'");
   if (seeded.rows.length === 0) {
     try {
@@ -39,6 +53,14 @@ async function init(): Promise<Client> {
       const again = await client.execute("SELECT 1 FROM app_meta WHERE key = 'seeded'");
       if (again.rows.length === 0) throw e;
     }
+  }
+  // Bring existing fictional profiles up to date without guessing real users' answers.
+  const legacySeeds = await client.execute("SELECT id, major FROM users WHERE is_seed = 1 AND (main_campus IS NULL OR degree IS NULL)");
+  if (legacySeeds.rows.length) {
+    await client.batch(legacySeeds.rows.map((row) => {
+      const academic = seedAcademics(String(row.major ?? ""));
+      return { sql: "UPDATE users SET main_campus = COALESCE(main_campus, ?), degree = COALESCE(degree, ?) WHERE id = ? AND is_seed = 1", args: [academic.campus, academic.degree, row.id] };
+    }), "write");
   }
   return client;
 }

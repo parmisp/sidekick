@@ -1,10 +1,10 @@
-import { DECK_AFFINITY_SHARE, DECK_SIZE, PASS_COOLDOWN_MS } from "./config";
+import { AFFINITY_WEIGHTS, DECK_AFFINITY_SHARE, DECK_SIZE, PASS_COOLDOWN_MS } from "./config";
 import { all, get, newId, run, tx, type Executor } from "./db";
 import { getProfiles } from "./profiles";
 import type { Profile, UserRow } from "./types";
 import { MUTUALLY_VISIBLE_SQL, viewerParams } from "./visibility";
 
-type CandidateRow = Pick<UserRow, "id" | "age" | "major" | "residence_status">;
+type CandidateRow = Pick<UserRow, "id" | "age" | "major" | "main_campus" | "residence_status">;
 
 /**
  * Everyone the viewer may be served right now:
@@ -40,10 +40,12 @@ export function affinityScore(
 ): number {
   let score = 0;
   const norm = (s: string | null) => (s ?? "").trim().toLowerCase();
-  if (norm(viewer.major) && norm(viewer.major) === norm(candidate.major)) score += 3;
-  if (viewer.age != null && candidate.age != null && Math.abs(viewer.age - candidate.age) <= 2) score += 2;
-  score += Math.min(4, candidateTags.filter((t) => viewerTags.has(t)).length);
-  if (viewer.residence_status && viewer.residence_status === candidate.residence_status) score += 1;
+  if (viewer.main_campus && viewer.main_campus === candidate.main_campus) score += AFFINITY_WEIGHTS.campus;
+  if (norm(viewer.major) && norm(viewer.major) === norm(candidate.major)) score += AFFINITY_WEIGHTS.major;
+  if (viewer.age != null && candidate.age != null && Math.abs(viewer.age - candidate.age) <= 2) score += AFFINITY_WEIGHTS.age;
+  const shared = new Set(candidateTags.filter((tag) => viewerTags.has(tag))).size;
+  score += Math.min(4, shared) / 4 * AFFINITY_WEIGHTS.interests;
+  if (viewer.residence_status && viewer.residence_status === candidate.residence_status) score += AFFINITY_WEIGHTS.residence;
   return score;
 }
 
@@ -65,7 +67,7 @@ export type DeckCard = { profile: Profile; sharedTagIds: number[]; reappearance:
  */
 export async function buildDeck(viewer: UserRow): Promise<DeckCard[]> {
   const [candidates, tagRows, cooldownRows] = await Promise.all([
-    all<CandidateRow>(`SELECT u.id, u.age, u.major, u.residence_status FROM users u WHERE ${ELIGIBLE_SQL}`, eligibleParams(viewer)),
+    all<CandidateRow>(`SELECT u.id, u.age, u.major, u.main_campus, u.residence_status FROM users u WHERE ${ELIGIBLE_SQL}`, eligibleParams(viewer)),
     all<{ user_id: string; tag_id: number }>("SELECT user_id, tag_id FROM user_interests"),
     all<{ swipee_id: string }>("SELECT swipee_id FROM pass_states WHERE swiper_id = ? AND state = 'cooldown_pending'", [viewer.id]),
   ]);
@@ -94,7 +96,7 @@ export async function buildDeck(viewer: UserRow): Promise<DeckCard[]> {
   }
 
   const reappearing = new Set(cooldownRows.map((r) => r.swipee_id));
-  const profiles = await getProfiles(deck.map((c) => c.id));
+  const profiles = await getProfiles(deck.map((c) => c.id), viewer);
   return profiles.map((profile) => ({
     profile,
     sharedTagIds: (tagsByUser.get(profile.id) ?? []).filter((t) => viewerTags.has(t)),

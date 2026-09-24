@@ -1,4 +1,5 @@
 import { all } from "./db";
+import { residenceName } from "./residences";
 import type { Profile, ProfilePhoto, ProfilePrompt, ProfileTag, UserRow } from "./types";
 
 const placeholders = (n: number) => Array(n).fill("?").join(",");
@@ -7,7 +8,7 @@ const placeholders = (n: number) => Array(n).fill("?").join(",");
  * Loads several profiles with 5 queries total (not 5 per profile) — matters when the
  * database is remote. Returned in the same order as `ids`; unknown ids are skipped.
  */
-export async function getProfiles(ids: string[]): Promise<Profile[]> {
+export async function getProfiles(ids: string[], viewer: Pick<UserRow, "residence_status"> | null = null): Promise<Profile[]> {
   if (ids.length === 0) return [];
   const inList = placeholders(ids.length);
   const [users, photos, interests, customTags, prompts] = await Promise.all([
@@ -51,7 +52,13 @@ export async function getProfiles(ids: string[]): Promise<Profile[]> {
         name: user.name!,
         age: user.age!,
         major: user.major!,
+        mainCampus: user.main_campus,
+        degree: user.degree,
+        hometown: user.hometown,
         residenceStatus: user.residence_status,
+        // Filter before serialization, not just in the UI. No viewer means no disclosure.
+        residenceName: viewer?.residence_status === "residence" && user.residence_status === "residence"
+          ? residenceName(user.residence_id) : null,
         photos: byUser(photos, id),
         interests: byUser(interests, id),
         customTag: custom ? { id: custom.id, text: custom.text } : null,
@@ -61,8 +68,8 @@ export async function getProfiles(ids: string[]): Promise<Profile[]> {
   });
 }
 
-export async function getProfile(userId: string): Promise<Profile | null> {
-  return (await getProfiles([userId]))[0] ?? null;
+export async function getProfile(userId: string, viewer: Pick<UserRow, "residence_status"> | null = null): Promise<Profile | null> {
+  return (await getProfiles([userId], viewer))[0] ?? null;
 }
 
 export function getTagTaxonomy(): Promise<ProfileTag[]> {
