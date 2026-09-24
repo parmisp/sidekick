@@ -324,3 +324,32 @@ test("deactivation hides both directions and pauses matches without deleting dat
   assert.equal((await setAccountActive(false)).ok, false);
   activeUserId = "test-student";
 });
+
+test("Discover navigation, inbox and chats bind only parameters present in their SQL", async () => {
+  const { countUnreadInbox, listInbox, getInboxItem } = require("../lib/inbox.ts");
+  const { listMatches, getMatchForViewer } = require("../lib/matches.ts");
+  const { buildDeck } = require("../lib/deck.ts");
+  const client = await db();
+  const originalExecute = client.execute;
+  // Local SQLite tolerates surplus names. Enforce the hosted database contract
+  // while still executing the real queries against the integration fixtures.
+  client.execute = function(statement, ...args) {
+    if (typeof statement === "object" && statement.args && !Array.isArray(statement.args)) {
+      const names = [...new Set([...statement.sql.matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g)].map((match) => match[1]))];
+      assert.deepEqual(Object.keys(statement.args).sort(), names.sort(), "SQL bindings must match its named parameters");
+    }
+    return originalExecute.call(this, statement, ...args);
+  };
+  try {
+    const viewer = await get("SELECT * FROM users WHERE id = 'test-student'");
+    assert.equal(typeof await countUnreadInbox(viewer), "number");
+    await buildDeck(viewer);
+    await listInbox(viewer);
+    assert.equal(await getInboxItem(viewer, "missing-comment"), null);
+    const matches = await listMatches(viewer);
+    assert.ok(matches.length);
+    assert.equal((await getMatchForViewer(viewer, matches[0].id)).id, matches[0].id);
+  } finally {
+    client.execute = originalExecute;
+  }
+});

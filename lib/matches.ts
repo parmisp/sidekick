@@ -1,6 +1,6 @@
 import { all, get } from "./db";
 import type { UserRow } from "./types";
-import { NOT_BLOCKED_SQL, viewerParams } from "./visibility";
+import { NOT_BLOCKED_SQL, notBlockedParams } from "./visibility";
 
 export type MatchSummary = {
   id: string;
@@ -35,7 +35,7 @@ export async function listMatches(viewer: UserRow): Promise<MatchSummary[]> {
        LEFT JOIN messages lm ON lm.id = (SELECT id FROM messages WHERE match_id = m.id ORDER BY created_at DESC LIMIT 1)
        WHERE (m.user_a_id = :viewerId OR m.user_b_id = :viewerId) AND ${NOT_BLOCKED_SQL("o")}
        ORDER BY COALESCE(lm.created_at, m.created_at) DESC`,
-    viewerParams(viewer),
+    notBlockedParams(viewer),
   );
   return rows.map((r) => ({
     id: r.id,
@@ -66,7 +66,7 @@ export async function getMatchForViewer(viewer: UserRow, matchId: string): Promi
        JOIN users o ON o.id = CASE WHEN m.user_a_id = :viewerId THEN m.user_b_id ELSE m.user_a_id END
        LEFT JOIN comments c ON c.id = m.source_comment_id
        WHERE m.id = :matchId AND (m.user_a_id = :viewerId OR m.user_b_id = :viewerId) AND ${NOT_BLOCKED_SQL("o")}`,
-    { ...viewerParams(viewer), matchId },
+    { ...notBlockedParams(viewer), matchId },
   );
   if (!row) return null;
   return {

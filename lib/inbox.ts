@@ -1,6 +1,6 @@
 import { all, get } from "./db";
 import type { CommentTargetType, UserRow } from "./types";
-import { NOT_BLOCKED_SQL, viewerParams } from "./visibility";
+import { NOT_BLOCKED_SQL, notBlockedParams } from "./visibility";
 
 export type InboxItem = {
   id: string;
@@ -25,7 +25,7 @@ const PENDING_SQL = /* sql */ `
 export async function countUnreadInbox(viewer: UserRow): Promise<number> {
   const row = await get<{ n: number }>(
     `SELECT COUNT(*) AS n FROM comments c JOIN users a ON a.id = c.author_id WHERE ${PENDING_SQL} AND c.is_read = 0`,
-    viewerParams(viewer),
+    notBlockedParams(viewer),
   );
   return row?.n ?? 0;
 }
@@ -83,10 +83,10 @@ function toItem(r: Row): InboxItem {
 }
 
 export async function listInbox(viewer: UserRow): Promise<InboxItem[]> {
-  return (await all<Row>(`${SELECT} WHERE ${PENDING_SQL} ORDER BY c.created_at DESC`, viewerParams(viewer))).map(toItem);
+  return (await all<Row>(`${SELECT} WHERE ${PENDING_SQL} ORDER BY c.created_at DESC`, notBlockedParams(viewer))).map(toItem);
 }
 
 export async function getInboxItem(viewer: UserRow, commentId: string): Promise<InboxItem | null> {
-  const row = await get<Row>(`${SELECT} WHERE c.id = :commentId AND ${PENDING_SQL}`, { ...viewerParams(viewer), commentId });
+  const row = await get<Row>(`${SELECT} WHERE c.id = :commentId AND ${PENDING_SQL}`, { ...notBlockedParams(viewer), commentId });
   return row ? toItem(row) : null;
 }

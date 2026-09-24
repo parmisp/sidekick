@@ -24,9 +24,16 @@ export const MUTUALLY_VISIBLE_SQL = /* sql */ `
 
 export function viewerParams(viewer: UserRow) {
   return {
-    viewerId: viewer.id,
+    ...notBlockedParams(viewer),
     viewerGender: viewer.gender,
     viewerFilter: viewer.gender_filter_mode,
+  };
+}
+
+/** Bind only the parameters used by NOT_BLOCKED_SQL; remote libSQL rejects extras. */
+export function notBlockedParams(viewer: UserRow) {
+  return {
+    viewerId: viewer.id,
     viewerPhoneHash: viewer.phone_hash ?? "",
   };
 }
