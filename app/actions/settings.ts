@@ -1,11 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertOnboardedUser } from "@/lib/auth";
+import { assertOnboardedUser, getCurrentUser } from "@/lib/auth";
 import { PASS_COOLDOWN_MS } from "@/lib/config";
 import { run, tx } from "@/lib/db";
 import { hashPhone, normalizePhone } from "@/lib/phone";
 import type { ActionResult, GenderFilterMode } from "@/lib/types";
+
+export async function setAccountActive(active: boolean): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Your session expired — sign in again." };
+  if (typeof active !== "boolean") return { ok: false, error: "Choose whether your account is active." };
+  await run("UPDATE users SET is_active = ? WHERE id = ?", [active ? 1 : 0, user.id]);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
 
 export async function updateGenderFilter(mode: GenderFilterMode): Promise<ActionResult> {
   const user = await assertOnboardedUser();

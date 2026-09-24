@@ -33,11 +33,43 @@ CREATE TABLE IF NOT EXISTS users (
   residence_id       TEXT,
   gender_filter_mode TEXT NOT NULL DEFAULT 'everyone' CHECK (gender_filter_mode IN ('everyone', 'same_gender')),
   profile_complete   INTEGER NOT NULL DEFAULT 0,
+  is_active          INTEGER NOT NULL DEFAULT 1,
   is_seed            INTEGER NOT NULL DEFAULT 0,
   demo_simulated     INTEGER NOT NULL DEFAULT 0,
   created_at         INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS users_phone_hash ON users(phone_hash);
+CREATE INDEX IF NOT EXISTS users_normalized_email ON users(lower(trim(email)));
+
+-- Enforce uniqueness on new writes without deleting any legacy accounts.
+CREATE TRIGGER IF NOT EXISTS users_unique_phone_insert
+BEFORE INSERT ON users WHEN NEW.phone_hash IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'PHONE_ALREADY_LINKED') WHERE EXISTS (
+    SELECT 1 FROM users WHERE phone_hash = NEW.phone_hash
+  );
+END;
+CREATE TRIGGER IF NOT EXISTS users_unique_phone_update
+BEFORE UPDATE OF phone_hash ON users WHEN NEW.phone_hash IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'PHONE_ALREADY_LINKED') WHERE EXISTS (
+    SELECT 1 FROM users WHERE phone_hash = NEW.phone_hash AND id != NEW.id
+  );
+END;
+CREATE TRIGGER IF NOT EXISTS users_unique_email_insert
+BEFORE INSERT ON users
+BEGIN
+  SELECT RAISE(IGNORE) WHERE EXISTS (
+    SELECT 1 FROM users WHERE lower(trim(email)) = lower(trim(NEW.email))
+  );
+END;
+CREATE TRIGGER IF NOT EXISTS users_unique_email_update
+BEFORE UPDATE OF email ON users
+BEGIN
+  SELECT RAISE(ABORT, 'EMAIL_ALREADY_LINKED') WHERE EXISTS (
+    SELECT 1 FROM users WHERE lower(trim(email)) = lower(trim(NEW.email)) AND id != NEW.id
+  );
+END;
 
 CREATE TABLE IF NOT EXISTS photos (
   id       TEXT PRIMARY KEY,

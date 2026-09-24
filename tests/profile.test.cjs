@@ -43,7 +43,7 @@ before(async () => {
   fs.mkdirSync(path.join(temp, "data"));
   const oldDb = createClient({ url: `file:${path.join(temp, "data", "sidekick.db")}` });
   // Reproduce a database created before hometown existed, with an existing user.
-  await oldDb.executeMultiple(SCHEMA.replace("  hometown           TEXT,\n", "").replace("  residence_id       TEXT,\n", "").replace("  main_campus        TEXT,\n", "").replace("  degree             TEXT,\n", ""));
+  await oldDb.executeMultiple(SCHEMA.replace("  hometown           TEXT,\n", "").replace("  residence_id       TEXT,\n", "").replace("  main_campus        TEXT,\n", "").replace("  degree             TEXT,\n", "").replace("  is_active          INTEGER NOT NULL DEFAULT 1,\n", ""));
   await oldDb.execute("INSERT INTO users (id, email, phone, is_seed, created_at) VALUES ('test-student', 'student@my.yorku.ca', '5550109999', 1, 1)");
   await oldDb.execute("INSERT INTO users (id, email, name, profile_complete, created_at) VALUES ('legacy-real-student', 'legacy@my.yorku.ca', 'Existing Student', 1, 1)");
   oldDb.close();
@@ -255,4 +255,72 @@ test("blocking before Discover hides both users, including when the blocked numb
   assert.equal((await buildDeck(viewer)).some((card) => card.profile.id === blocked.id), false);
   const count = await get("SELECT COUNT(*) AS n FROM phone_blocks WHERE blocker_id = ?", [viewer.id]);
   assert.equal(count.n, 1);
+});
+
+test("an email cannot create a second account through case or whitespace variants", async () => {
+  await run("INSERT OR IGNORE INTO users (id, email, created_at) VALUES ('duplicate-email', ' STUDENT@MY.YORKU.CA ', 1)");
+  assert.equal(await get("SELECT id FROM users WHERE id = 'duplicate-email'"), null);
+  assert.equal((await get("SELECT COUNT(*) AS n FROM users WHERE lower(trim(email)) = 'student@my.yorku.ca'")).n, 1);
+  await assert.rejects(run("UPDATE users SET email = 'STUDENT@MY.YORKU.CA' WHERE id = 'cross-campus'"), /EMAIL_ALREADY_LINKED/);
+});
+
+test("phone ownership is unique across formatting variants and repeat saves by the owner work", async () => {
+  const { savePhone } = require("../app/actions/auth.ts");
+  activeUserId = "test-student";
+  assert.equal((await savePhone("(647) 555-0123")).ok, true);
+  assert.equal((await savePhone("+1 647 555 0123")).ok, true);
+  activeUserId = "cross-campus";
+  const duplicate = await savePhone("6475550123");
+  assert.equal(duplicate.ok, false);
+  assert.match(duplicate.error, /already linked/);
+  assert.equal((await savePhone("(647) 555-0124")).ok, true);
+  assert.equal((await savePhone(null)).ok, false);
+  assert.equal((await savePhone("12")).ok, false);
+  activeUserId = "test-student";
+});
+
+test("database rejects concurrent phone claims and direct duplicate inserts", async () => {
+  const { hashPhone } = require("../lib/phone.ts");
+  const phoneHash = hashPhone("16475550125");
+  const results = await Promise.allSettled([
+    run("UPDATE users SET phone_hash = ? WHERE id = 'test-student'", [phoneHash]),
+    run("UPDATE users SET phone_hash = ? WHERE id = 'cross-campus'", [phoneHash]),
+  ]);
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal((await get("SELECT COUNT(*) AS n FROM users WHERE phone_hash = ?", [phoneHash])).n, 1);
+  await assert.rejects(run("INSERT INTO users (id, email, phone_hash, created_at) VALUES ('duplicate-phone', 'unique@my.yorku.ca', ?, 1)", [phoneHash]), /PHONE_ALREADY_LINKED/);
+});
+
+
+test("deactivation hides both directions and pauses matches without deleting data", async () => {
+  const { setAccountActive } = require("../app/actions/settings.ts");
+  const { canSee } = require("../lib/visibility.ts");
+  const { buildDeck } = require("../lib/deck.ts");
+  const { listMatches, getMatchForViewer } = require("../lib/matches.ts");
+  const { listInbox } = require("../lib/inbox.ts");
+  activeUserId = "test-student";
+  const viewer = await get("SELECT * FROM users WHERE id = ?", [activeUserId]);
+  const other = await get("SELECT * FROM users WHERE id = 'cross-campus'");
+  const matchesBefore = await listMatches(viewer);
+  assert.ok(matchesBefore.length);
+  const matchId = matchesBefore[0].id;
+  const profileBefore = await getProfile(viewer.id);
+  assert.equal((await setAccountActive(false)).ok, true);
+  assert.equal((await get("SELECT is_active FROM users WHERE id = ?", [viewer.id])).is_active, 0);
+  assert.equal(await canSee(viewer, other.id), false);
+  assert.equal(await canSee(other, viewer.id), false);
+  assert.deepEqual(await buildDeck(viewer), []);
+  assert.deepEqual(await listMatches(viewer), []);
+  assert.deepEqual(await listInbox(viewer), []);
+  assert.equal(await getMatchForViewer(other, matchId), null);
+  assert.equal(await getProfile(viewer.id), null);
+  assert.equal((await buildDeck(other)).some((card) => card.profile.id === viewer.id), false);
+  assert.equal((await setAccountActive(true)).ok, true);
+  assert.deepEqual(await getProfile(viewer.id), profileBefore);
+  assert.deepEqual(await listMatches(viewer), matchesBefore);
+  assert.equal(await canSee(viewer, other.id), true);
+  assert.equal((await setAccountActive("false")).ok, false);
+  activeUserId = "missing-session";
+  assert.equal((await setAccountActive(false)).ok, false);
+  activeUserId = "test-student";
 });

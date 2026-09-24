@@ -82,6 +82,10 @@ I used plain SQL through `@libsql/client` instead of Prisma. The same code runs 
 
 ### Product rules as implemented
 
+- **Account activation**: Settings has an Account active switch. Switching off hides the user from Discover, inbox and matches, blocks browsing and chat access, and shows a deactivated page with reactivation controls. Profile data, friendships and messages remain stored. Settings and logout remain accessible. Existing accounts default to active.
+
+- **Unique accounts**: email addresses are compared without case or surrounding spaces; signing in again opens the same account. A normalized phone number can only be attached to one account. Database triggers protect both rules, including concurrent phone claims, without deleting legacy accounts. Phone ownership still requires a future SMS verification integration.
+
 - **Deck**: batches of up to 20. Every 4th card comes from a random discovery pool (profiles outside the top affinity slice). The other ~75% are ranked by affinity: same main campus 40 points, shared interests up to 25 points (4 shared interests earns the full weight), shared major 20 points, age within 2 years 10 points, and same residence status 5 points. Campus is 40% of the maximum compatibility score, not a campus quota or restriction. A strong cross-campus match can outrank a same-campus match; all three campuses remain eligible. Ties are broken randomly.
 - **Excluded from the deck**: people you've friend-swiped, existing matches, anyone in a 30-day pass cooldown, anyone permanently excluded, blocked pairs (either direction), and anyone outside the gender filter.
 - **Academics**: main campus (Keele, Glendon or Markham) and degree are required alongside major. Degree choices include BA, BSc, BEng, MA, MSc, PhD and others, plus Other and Undecided. Profiles show campus and “Major · Degree.” Existing users fill in the new answers when they next enter the app, with their previous profile prefilled.

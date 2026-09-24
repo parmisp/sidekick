@@ -64,6 +64,7 @@ function validate(input: ProfileInput): string | null {
 export async function saveProfile(input: ProfileInput): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user || !user.phone) return { ok: false, error: "Your session expired — sign in again." };
+  if (!user.is_active) return { ok: false, error: "Reactivate your account in Settings before editing your profile." };
   const error = validate(input);
   if (error) return { ok: false, error };
 

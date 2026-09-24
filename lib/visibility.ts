@@ -11,6 +11,8 @@ import type { UserRow } from "./types";
  */
 export const MUTUALLY_VISIBLE_SQL = /* sql */ `
   u.profile_complete = 1
+  AND u.is_active = 1
+  AND EXISTS (SELECT 1 FROM users viewer WHERE viewer.id = :viewerId AND viewer.is_active = 1)
   AND u.main_campus IS NOT NULL
   AND u.degree IS NOT NULL
   AND u.id != :viewerId
@@ -34,6 +36,8 @@ export async function canSee(viewer: UserRow, targetId: string): Promise<boolean
 }
 
 export const NOT_BLOCKED_SQL = (otherAlias: string) => /* sql */ `
-  NOT EXISTS (SELECT 1 FROM phone_blocks b WHERE b.blocker_id = :viewerId AND b.blocked_phone_hash = ${otherAlias}.phone_hash)
+  ${otherAlias}.is_active = 1
+  AND EXISTS (SELECT 1 FROM users viewer WHERE viewer.id = :viewerId AND viewer.is_active = 1)
+  AND NOT EXISTS (SELECT 1 FROM phone_blocks b WHERE b.blocker_id = :viewerId AND b.blocked_phone_hash = ${otherAlias}.phone_hash)
   AND NOT EXISTS (SELECT 1 FROM phone_blocks b WHERE b.blocker_id = ${otherAlias}.id AND b.blocked_phone_hash = :viewerPhoneHash)
 `;

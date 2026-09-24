@@ -21,6 +21,7 @@ export interface UserRow {
   residence_id: string | null;
   gender_filter_mode: GenderFilterMode;
   profile_complete: number;
+  is_active: number;
   is_seed: number;
   demo_simulated: number;
   created_at: number;

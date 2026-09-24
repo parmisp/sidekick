@@ -43,6 +43,15 @@ async function init(): Promise<Client> {
     }
   }
 
+  if (!columns.includes("is_active")) {
+    try {
+      await client.execute("ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
+    } catch (error) {
+      const current = await client.execute("PRAGMA table_info(users)");
+      if (!current.rows.some((column) => column.name === "is_active")) throw error;
+    }
+  }
+
   const seeded = await client.execute("SELECT 1 FROM app_meta WHERE key = 'seeded'");
   if (seeded.rows.length === 0) {
     try {

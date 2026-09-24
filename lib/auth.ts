@@ -54,9 +54,10 @@ export async function getCurrentUser(): Promise<UserRow | null> {
 }
 
 /** For pages: signed-in user who has finished onboarding, otherwise redirect to the right step. */
-export async function requireOnboardedUser(): Promise<UserRow> {
+export async function requireOnboardedUser({ allowInactive = false }: { allowInactive?: boolean } = {}): Promise<UserRow> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!user.is_active && !allowInactive) redirect("/deactivated");
   if (!user.phone) redirect("/login/phone");
   if (!user.profile_complete || !user.main_campus || !user.degree) redirect("/setup");
   return user;
@@ -65,6 +66,7 @@ export async function requireOnboardedUser(): Promise<UserRow> {
 /** For server actions / route handlers: throws instead of redirecting. */
 export async function assertOnboardedUser(): Promise<UserRow> {
   const user = await getCurrentUser();
+  if (user && !user.is_active) throw new Error("Your account is deactivated. Reactivate it in Settings.");
   if (!user || !user.profile_complete || !user.main_campus || !user.degree) throw new Error("Finish setting up your profile first.");
   return user;
 }

@@ -8,6 +8,7 @@ import { DEMO_EMAIL } from "@/lib/config";
 export default async function SetupPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!user.is_active) redirect("/deactivated");
   if (!user.phone) redirect("/login/phone");
 
   // Editing an existing profile re-uses the same wizard, pre-filled.

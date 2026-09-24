@@ -1,17 +1,27 @@
 import { BlockPhoneForm } from "@/components/BlockPhoneForm";
+import { AccountActivation } from "@/components/AccountActivation";
 import { logout } from "@/app/actions/auth";
 import { requireOnboardedUser } from "@/lib/auth";
 import { get } from "@/lib/db";
 import { DemoTools, GenderFilterSetting } from "./SettingsForms";
 
 export default async function SettingsPage() {
-  const user = await requireOnboardedUser();
+  const user = await requireOnboardedUser({ allowInactive: true });
+  if (!user.is_active) return (
+    <div className="flex flex-col gap-5">
+      <h1 className="font-serif text-3xl font-semibold">Settings</h1>
+      <p className="text-ink-soft">Your account is deactivated.</p>
+      <AccountActivation active={false} />
+      <form action={logout}><button className="btn-secondary">Log out</button></form>
+    </div>
+  );
   const cooldowns =
     (await get<{ n: number }>("SELECT COUNT(*) AS n FROM pass_states WHERE swiper_id = ? AND state = 'cooldown_pending'", [user.id]))?.n ?? 0;
 
   return (
     <div className="flex flex-col gap-4 pt-2">
       <h1 className="px-1 font-serif text-3xl font-semibold">Settings</h1>
+      <AccountActivation active />
 
       <section className="card p-5">
         <h2 className="font-serif text-xl font-semibold">Who you see</h2>

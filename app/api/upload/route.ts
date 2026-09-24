@@ -8,6 +8,7 @@ const MAX_BYTES = 4 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
+  if (user && !user.is_active) return Response.json({ error: "Your account is deactivated." }, { status: 403 });
   if (!user) return Response.json({ error: "Not signed in" }, { status: 401 });
 
   const form = await request.formData();

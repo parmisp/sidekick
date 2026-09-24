@@ -12,7 +12,7 @@ export async function getProfiles(ids: string[], viewer: Pick<UserRow, "residenc
   if (ids.length === 0) return [];
   const inList = placeholders(ids.length);
   const [users, photos, interests, customTags, prompts] = await Promise.all([
-    all<UserRow>(`SELECT * FROM users WHERE id IN (${inList}) AND name IS NOT NULL`, ids),
+    all<UserRow>(`SELECT * FROM users WHERE id IN (${inList}) AND name IS NOT NULL AND is_active = 1`, ids),
     all<ProfilePhoto & { userId: string }>(
       `SELECT id, user_id AS userId, url, position FROM photos WHERE user_id IN (${inList}) ORDER BY position`,
       ids,
